@@ -112,3 +112,11 @@ export enum UserRole {
   TEAM_MANAGER = 'TEAM_MANAGER',
   ADMIN = 'ADMIN'
 }
+
+export interface User {
+  id: string;
+  username: string;
+  role: UserRole;
+  teamId?: string;
+  isApproved: boolean;
+}

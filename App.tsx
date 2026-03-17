@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useEffect } from 'https://esm.sh/react@19.0.0';
 import { createClient } from 'https://esm.sh/@libsql/client@0.17.0/web';
-import { Team, Match, Player, Standing, UserRole, GoalScorer, CardEvent, LeagueSettings, NewsItem, Ad } from './types.ts';
+import { Team, Match, Player, Standing, UserRole, User, GoalScorer, CardEvent, LeagueSettings, NewsItem, Ad } from './types.ts';
 import { INITIAL_TEAMS, INITIAL_MATCHES, DEFAULT_LEAGUE_SETTINGS } from './constants.tsx';
 import Dashboard from './components/Dashboard.tsx';
 import TeamRegistration from './components/TeamRegistration.tsx';
@@ -46,6 +46,7 @@ const App: React.FC = () => {
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncError, setSyncError] = useState<string | null>(null);
   const [dbLogs, setDbLogs] = useState<string[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
 
   const addLog = (msg: string) => {
     const timestamp = new Date().toLocaleTimeString();
@@ -62,7 +63,15 @@ const App: React.FC = () => {
         await db.execute(`CREATE TABLE IF NOT EXISTS news (id TEXT PRIMARY KEY, data TEXT);`);
         await db.execute(`CREATE TABLE IF NOT EXISTS ads (id TEXT PRIMARY KEY, data TEXT);`);
         await db.execute(`CREATE TABLE IF NOT EXISTS settings (id TEXT PRIMARY KEY, data TEXT);`);
-        await db.execute(`CREATE TABLE IF NOT EXISTS users (id TEXT PRIMARY KEY, username TEXT UNIQUE, password TEXT, role TEXT, teamId TEXT);`);
+        await db.execute(`CREATE TABLE IF NOT EXISTS users (id TEXT PRIMARY KEY, username TEXT UNIQUE, password TEXT, role TEXT, teamId TEXT, isApproved INTEGER DEFAULT 1);`);
+        
+        // Ensure isApproved column exists (migration)
+        try {
+          await db.execute(`ALTER TABLE users ADD COLUMN isApproved INTEGER DEFAULT 1;`);
+        } catch (e) {
+          // Column might already exist
+        }
+        
         addLog('✅ Schema ready');
       } catch (e) {
         addLog('❌ Schema verification failed');
@@ -156,28 +165,76 @@ const App: React.FC = () => {
         settings: s.rows.length > 0 ? JSON.parse(s.rows[0].data as string) as LeagueSettings : null
       };
     },
+    fetchUsers: async () => {
+      const res = await db.execute("SELECT id, username, role, teamId, isApproved FROM users");
+      return res.rows.map(r => ({
+        id: r.id as string,
+        username: r.username as string,
+        role: r.role as UserRole,
+        teamId: r.teamId as string,
+        isApproved: r.isApproved === 1
+      })) as User[];
+    },
+    updateUserStatus: async (id: string, isApproved: boolean, role?: UserRole) => {
+      if (role) {
+        await db.execute({
+          sql: "UPDATE users SET isApproved = ?, role = ? WHERE id = ?",
+          args: [isApproved ? 1 : 0, role, id]
+        });
+      } else {
+        await db.execute({
+          sql: "UPDATE users SET isApproved = ? WHERE id = ?",
+          args: [isApproved ? 1 : 0, id]
+        });
+      }
+    },
+    deleteUser: async (id: string) => {
+      await db.execute({
+        sql: "DELETE FROM users WHERE id = ?",
+        args: [id]
+      });
+    },
+    deleteTeam: async (id: string) => {
+      await db.execute({
+        sql: "DELETE FROM teams WHERE id = ?",
+        args: [id]
+      });
+      // Also delete matches involving this team
+      await db.execute({
+        sql: "DELETE FROM matches WHERE id LIKE ?",
+        args: [`%${id}%`]
+      });
+    },
     login: async (username: string, password: string) => {
-      if (username === 'admin' && password === 'admin123') return { role: UserRole.ADMIN, id: 'u-admin', username: 'admin' };
+      if (username === 'admin' && password === 'admin123') return { role: UserRole.ADMIN, id: 'u-admin', username: 'admin', isApproved: true };
       const res = await db.execute({
-        sql: "SELECT id, role, teamId FROM users WHERE username = ? AND password = ?",
+        sql: "SELECT id, role, teamId, isApproved FROM users WHERE username = ? AND password = ?",
         args: [username, password]
       });
-      if (res.rows.length > 0) return { 
-        id: res.rows[0].id as string, 
-        role: res.rows[0].role as UserRole, 
-        teamId: res.rows[0].teamId as string,
-        username: username
-      };
+      if (res.rows.length > 0) {
+        const user = { 
+          id: res.rows[0].id as string, 
+          role: res.rows[0].role as UserRole, 
+          teamId: res.rows[0].teamId as string,
+          username: username,
+          isApproved: res.rows[0].isApproved === 1
+        };
+        if (user.role === UserRole.TEAM_MANAGER && !user.isApproved) {
+          throw new Error("Your account is pending admin approval.");
+        }
+        return user;
+      }
       throw new Error("Invalid credentials");
     },
     register: async (username: string, password: string, teamId: string) => {
       const id = `u-${Date.now()}`;
       const actualTeamId = teamId || null;
+      const isApproved = 0; // Managers need approval
       await db.execute({
-        sql: "INSERT INTO users (id, username, password, role, teamId) VALUES (?, ?, ?, ?, ?)",
-        args: [id, username, password, UserRole.TEAM_MANAGER, actualTeamId]
+        sql: "INSERT INTO users (id, username, password, role, teamId, isApproved) VALUES (?, ?, ?, ?, ?, ?)",
+        args: [id, username, password, UserRole.TEAM_MANAGER, actualTeamId, isApproved]
       });
-      return { id, username, role: UserRole.TEAM_MANAGER, teamId: actualTeamId };
+      return { id, username, role: UserRole.TEAM_MANAGER, teamId: actualTeamId, isApproved: false };
     },
     linkUserToTeam: async (uid: string, tid: string) => {
       await db.execute({
@@ -248,6 +305,44 @@ const App: React.FC = () => {
       }
     }
   }, [teams, matches, leagueSettings, news, ads, role, selectedTeamId, userId, isLoaded]);
+
+  useEffect(() => {
+    if (role === UserRole.ADMIN && isLoaded) {
+      dbService.fetchUsers().then(setUsers).catch(e => addLog(`❌ Failed to fetch users: ${e.message}`));
+    }
+  }, [role, isLoaded]);
+
+  const handleUpdateUserStatus = async (id: string, isApproved: boolean, role?: UserRole) => {
+    try {
+      await dbService.updateUserStatus(id, isApproved, role);
+      setUsers(prev => prev.map(u => u.id === id ? { ...u, isApproved, role: role || u.role } : u));
+      addLog(`✅ User ${id} status updated to ${isApproved ? 'Approved' : 'Pending'} ${role ? `(Role: ${role})` : ''}`);
+    } catch (e) {
+      addLog(`❌ Failed to update user status: ${e instanceof Error ? e.message : 'Unknown error'}`);
+    }
+  };
+
+  const handleDeleteUser = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this user?')) return;
+    try {
+      await dbService.deleteUser(id);
+      setUsers(prev => prev.filter(u => u.id !== id));
+      addLog(`✅ User ${id} deleted`);
+    } catch (e) {
+      addLog(`❌ Failed to delete user: ${e instanceof Error ? e.message : 'Unknown error'}`);
+    }
+  };
+
+  const handleDeleteTeam = async (id: string) => {
+    try {
+      await dbService.deleteTeam(id);
+      setTeams(prev => prev.filter(t => t.id !== id));
+      setMatches(prev => prev.filter(m => m.homeTeamId !== id && m.awayTeamId !== id));
+      addLog(`✅ Team ${id} and its matches deleted`);
+    } catch (e) {
+      addLog(`❌ Failed to delete team: ${e instanceof Error ? e.message : 'Unknown error'}`);
+    }
+  };
 
   const standings = useMemo(() => {
     const table: Record<string, Standing> = {};
@@ -430,7 +525,7 @@ const App: React.FC = () => {
                 leagueSettings={leagueSettings} 
               />;
               case 'admin': return <AdminPanel 
-                teams={teams} matches={matches} standings={standings} news={news} ads={ads} leagueSettings={leagueSettings}
+                teams={teams} matches={matches} standings={standings} news={news} ads={ads} users={users} leagueSettings={leagueSettings}
                 onUpdateLeagueSettings={(s) => { setLeagueSettings(s); dbService.saveSettings(s).catch(() => {}); }}
                 onUpdateMatch={() => {}} 
                 onUpdateTeam={(t) => { setTeams(p => p.map(u => u.id === t.id ? t : u)); dbService.saveTeam(t).catch(() => {}); }}
@@ -492,12 +587,14 @@ const App: React.FC = () => {
                   setLeagueSettings(updated);
                   dbService.saveSettings(updated).catch(() => {});
                 }}
+                onUpdateUserStatus={handleUpdateUserStatus}
+                onDeleteUser={handleDeleteUser}
+                onDeleteTeam={handleDeleteTeam}
                 onRegisterTeam={() => setView('registration')}
                 onManageSquad={(tid) => { setSelectedTeamId(tid); setView('players'); }}
                 onReset={() => { if(confirm('Reset local data?')) { setTeams(INITIAL_TEAMS); setMatches(INITIAL_MATCHES); } }} 
                 onForceSync={forcePushToCloud}
                 dbLogs={dbLogs}
-                onImportState={() => {}}
               />;
               case 'players':
                 const teamToManage = teams.find(t => t.id === selectedTeamId);

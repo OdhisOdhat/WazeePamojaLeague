@@ -1,7 +1,7 @@
 
 import React, { useState, useRef } from 'https://esm.sh/react@19.0.0';
 import * as XLSX from 'https://esm.sh/xlsx@0.18.5';
-import { Team, Match, Standing, GoalScorer, LeagueSettings, NewsItem, Ad, StandingOverride } from '../types.ts';
+import { Team, Match, Standing, GoalScorer, LeagueSettings, NewsItem, Ad, StandingOverride, User, UserRole } from '../types.ts';
 
 interface AdminPanelProps {
   teams: Team[];
@@ -9,6 +9,7 @@ interface AdminPanelProps {
   standings: Standing[];
   news: NewsItem[];
   ads: Ad[];
+  users: User[];
   leagueSettings: LeagueSettings;
   onUpdateLeagueSettings: (settings: LeagueSettings) => void;
   onUpdateMatch: (id: string, h: number, a: number, scorers: GoalScorer[], cards?: any[], refereeName?: string, refereeGrade?: string, isCompleted?: boolean, isLive?: boolean, date?: string, time?: string, venue?: string) => void;
@@ -22,20 +23,24 @@ interface AdminPanelProps {
   onRegisterTeam: () => void;
   onManageSquad: (teamId: string) => void;
   onReset: () => void;
-  onImportState: (data: any) => void;
+  onImportState?: (data: any) => void;
   onImportMatches: (matches: Match[]) => void;
   onUpdateStandingOverrides: (overrides: StandingOverride[]) => void;
+  onUpdateUserStatus: (id: string, isApproved: boolean, role?: UserRole) => void;
+  onDeleteUser: (id: string) => void;
+  onDeleteTeam?: (id: string) => void;
   dbLogs?: string[];
   onForceSync?: () => void;
 }
 
 const AdminPanel: React.FC<AdminPanelProps> = ({ 
-  teams, matches, standings, news, ads, leagueSettings, onUpdateLeagueSettings, onUpdateTeam, onSaveNews, onDeleteNews, onDeleteNewsItems, onSaveAd, onDeleteAd, onDeleteAds, onRegisterTeam, onManageSquad, onReset, dbLogs, onForceSync, onImportMatches, onUpdateStandingOverrides 
+  teams, matches, standings, news, ads, users, leagueSettings, onUpdateLeagueSettings, onUpdateTeam, onSaveNews, onDeleteNews, onDeleteNewsItems, onSaveAd, onDeleteAd, onDeleteAds, onRegisterTeam, onManageSquad, onReset, dbLogs, onForceSync, onImportMatches, onUpdateStandingOverrides, onUpdateUserStatus, onDeleteUser, onDeleteTeam 
 }) => {
   const [editingTeam, setEditingTeam] = useState<Team | null>(null);
   const [settingsForm, setSettingsForm] = useState<LeagueSettings>(leagueSettings);
   const [selectedNewsIds, setSelectedNewsIds] = useState<string[]>([]);
   const [selectedAdIds, setSelectedAdIds] = useState<string[]>([]);
+  const [teamSearch, setTeamSearch] = useState('');
   const [newsForm, setNewsForm] = useState<Partial<NewsItem>>({
     title: '', content: '', imageUrl: '', important: false
   });
@@ -48,6 +53,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
     members: false,
     news: false,
     ads: false,
+    users: true,
     fixtures: true,
     standings: false
   });
@@ -442,6 +448,118 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
         )}
       </div>
 
+      {/* User Management Section */}
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden mb-6">
+        <button 
+          onClick={() => setExpandedSections(prev => ({ ...prev, users: !prev.users }))}
+          className="w-full px-6 py-4 flex items-center justify-between bg-gray-50/50 hover:bg-gray-50 transition-colors"
+        >
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-indigo-100 rounded-lg text-indigo-600">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+              </svg>
+            </div>
+            <h2 className="text-lg font-bold text-gray-900">User Management</h2>
+          </div>
+          <svg className={`w-5 h-5 text-gray-400 transition-transform ${expandedSections.users ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
+
+        {expandedSections.users && (
+          <div className="p-6">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="border-b border-gray-100">
+                    <th className="py-3 px-4 text-xs font-black uppercase tracking-widest text-gray-400">Username</th>
+                    <th className="py-3 px-4 text-xs font-black uppercase tracking-widest text-gray-400">Role</th>
+                    <th className="py-3 px-4 text-xs font-black uppercase tracking-widest text-gray-400">Team</th>
+                    <th className="py-3 px-4 text-xs font-black uppercase tracking-widest text-gray-400">Status</th>
+                    <th className="py-3 px-4 text-xs font-black uppercase tracking-widest text-gray-400 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {users.filter(u => u.username !== 'admin').map(user => {
+                    const userTeam = teams.find(t => t.id === user.teamId);
+                    return (
+                      <tr key={user.id} className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors">
+                        <td className="py-4 px-4">
+                          <span className="font-bold text-gray-900">{user.username}</span>
+                        </td>
+                        <td className="py-4 px-4">
+                          <select 
+                            value={user.role}
+                            onChange={(e) => onUpdateUserStatus(user.id, user.isApproved, e.target.value as UserRole)}
+                            className="text-xs font-bold px-2 py-1 bg-gray-100 text-gray-600 rounded-lg uppercase outline-none focus:ring-2 focus:ring-indigo-500"
+                          >
+                            <option value={UserRole.GUEST}>Guest</option>
+                            <option value={UserRole.TEAM_MANAGER}>Team Manager</option>
+                            <option value={UserRole.ADMIN}>Admin</option>
+                          </select>
+                        </td>
+                        <td className="py-4 px-4">
+                          <span className="text-sm text-gray-600">{userTeam?.name || 'N/A'}</span>
+                        </td>
+                        <td className="py-4 px-4">
+                          {user.isApproved ? (
+                            <span className="flex items-center gap-1.5 text-emerald-600 text-xs font-bold uppercase">
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-600"></span>
+                              Approved
+                            </span>
+                          ) : (
+                            <span className="flex items-center gap-1.5 text-amber-600 text-xs font-bold uppercase">
+                              <span className="w-1.5 h-1.5 rounded-full bg-amber-600 animate-pulse"></span>
+                              Pending Approval
+                            </span>
+                          )}
+                        </td>
+                        <td className="py-4 px-4 text-right">
+                          <div className="flex items-center justify-end gap-2">
+                            {!user.isApproved ? (
+                              <button
+                                onClick={() => onUpdateUserStatus(user.id, true)}
+                                className="px-3 py-1.5 bg-emerald-50 text-emerald-600 rounded-lg text-xs font-bold hover:bg-emerald-100 transition-colors uppercase tracking-wider"
+                              >
+                                Approve
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => onUpdateUserStatus(user.id, false)}
+                                className="px-3 py-1.5 bg-amber-50 text-amber-600 rounded-lg text-xs font-bold hover:bg-amber-100 transition-colors uppercase tracking-wider"
+                              >
+                                Suspend
+                              </button>
+                            )}
+                            <button
+                              onClick={() => onDeleteUser(user.id)}
+                              className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                              title="Delete User"
+                            >
+                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                              </svg>
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  {users.filter(u => u.username !== 'admin').length === 0 && (
+                    <tr>
+                      <td colSpan={5} className="py-12 text-center text-gray-400 font-medium italic">
+                        No registered users found.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+      </div>
+
       {/* Hero Ad Management - Strictly for Admin */}
       <div className="bg-white p-8 rounded-[2rem] border border-gray-100 shadow-xl">
         <SectionHeader title="Hero Ad Management" icon="fa-ad" sectionKey="ads" />
@@ -650,30 +768,60 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
 
       {/* Teams Management */}
       <div className="bg-white p-8 rounded-[2rem] border border-gray-100 shadow-xl">
-        <div className="flex justify-between items-center mb-4">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
           <SectionHeader title={`Manage Teams (${teams.length})`} icon="fa-shield-alt" sectionKey="members" />
-          <button 
-            onClick={onRegisterTeam}
-            className="bg-blue-600 text-white px-4 py-2 rounded-xl font-black uppercase text-[10px] tracking-widest hover:bg-blue-700 transition-all flex items-center space-x-2 shadow-lg"
-          >
-            <i className="fas fa-plus"></i>
-            <span>Register New Team</span>
-          </button>
+          <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+            <div className="relative flex-1 md:w-64">
+              <i className="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 text-xs"></i>
+              <input 
+                type="text" 
+                placeholder="Search teams..." 
+                className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-100 rounded-xl text-sm font-bold outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                value={teamSearch}
+                onChange={e => setTeamSearch(e.target.value)}
+              />
+            </div>
+            <button 
+              onClick={onRegisterTeam}
+              className="bg-blue-600 text-white px-4 py-2.5 rounded-xl font-black uppercase text-[10px] tracking-widest hover:bg-blue-700 transition-all flex items-center space-x-2 shadow-lg"
+            >
+              <i className="fas fa-plus"></i>
+              <span>Register New Team</span>
+            </button>
+          </div>
         </div>
         {expandedSections.members && (
           <div className="space-y-3 animate-in slide-in-from-top-2">
-            {teams.map(team => (
+            {teams
+              .filter(t => t.name.toLowerCase().includes(teamSearch.toLowerCase()) || t.manager.toLowerCase().includes(teamSearch.toLowerCase()))
+              .map(team => (
               <div key={team.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-2xl hover:bg-white hover:shadow-md transition-all group border border-transparent hover:border-blue-50">
                 <div className="flex items-center space-x-4">
                   <img src={team.logo} className="w-12 h-12 rounded-xl object-cover shadow-sm bg-white" alt="" />
                   <div><p className="font-black text-gray-900 leading-none mb-1">{team.name}</p><p className="text-[10px] font-bold text-gray-400 uppercase">{team.manager} • {team.players.length} Players</p></div>
                 </div>
                 <div className="flex space-x-2">
-                  <button onClick={() => setEditingTeam(team)} className="p-3 text-blue-500 hover:bg-blue-50 rounded-xl transition-colors"><i className="fas fa-edit"></i></button>
-                  <button onClick={() => onManageSquad(team.id)} className="p-3 text-indigo-500 hover:bg-indigo-50 rounded-xl transition-colors"><i className="fas fa-users"></i></button>
+                  <button onClick={() => setEditingTeam(team)} className="p-3 text-blue-500 hover:bg-blue-50 rounded-xl transition-colors" title="Edit Team"><i className="fas fa-edit"></i></button>
+                  <button onClick={() => onManageSquad(team.id)} className="p-3 text-indigo-500 hover:bg-indigo-50 rounded-xl transition-colors" title="Manage Squad"><i className="fas fa-users"></i></button>
+                  <button 
+                    onClick={() => {
+                      if (confirm(`Are you sure you want to delete ${team.name}? This will also delete its matches.`)) {
+                        onDeleteTeam?.(team.id);
+                      }
+                    }} 
+                    className="p-3 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-colors"
+                    title="Delete Team"
+                  >
+                    <i className="fas fa-trash-alt"></i>
+                  </button>
                 </div>
               </div>
             ))}
+            {teams.filter(t => t.name.toLowerCase().includes(teamSearch.toLowerCase()) || t.manager.toLowerCase().includes(teamSearch.toLowerCase())).length === 0 && (
+              <div className="py-12 text-center text-gray-400 font-medium italic">
+                No teams found matching your search.
+              </div>
+            )}
           </div>
         )}
       </div>

@@ -29,8 +29,11 @@ const Login: React.FC<LoginProps> = ({ teams, onLogin, onBack, loginFn, register
         if (activeTab === 'admin') throw new Error('Admin registration disabled');
         if (!registerFn) throw new Error('Registration unavailable');
 
-        const user = await registerFn(username, password, selectedTeamId);
-        onLogin(UserRole.TEAM_MANAGER, user.teamId, user.id, user.username);
+        await registerFn(username, password, selectedTeamId);
+        setError('Registration successful! Please wait for admin approval before logging in.');
+        setIsRegistering(false);
+        setUsername('');
+        setPassword('');
       } else {
         const user = await loginFn(username, password);
         onLogin(user.role, user.teamId, user.id, user.username);
