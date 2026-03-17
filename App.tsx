@@ -314,17 +314,28 @@ const App: React.FC = () => {
               );
               case 'dashboard': return <Dashboard teams={teams} matches={matches} standings={standings} news={news} ads={ads} setView={setView} leagueSettings={leagueSettings} role={role} selectedTeamId={selectedTeamId} />;
               case 'standings': return <StandingsTable standings={standings} teams={teams} leagueSettings={leagueSettings} />;
-              case 'registration': return <TeamRegistration onRegister={(tData) => { 
+              case 'registration': return <TeamRegistration 
+                onRegister={(tData) => { 
                   const newTeamId = `t${Date.now()}`;
                   const newTeam = { ...tData, id: newTeamId, players: [] };
                   setTeams(p => [...p, newTeam]);
                   dbService.saveTeam(newTeam).catch(() => {});
-                  if (role === UserRole.TEAM_MANAGER && !selectedTeamId && userId) {
+                  
+                  // If admin is registering, allow them to manage the squad immediately
+                  if (role === UserRole.ADMIN) {
+                    setSelectedTeamId(newTeamId);
+                    setView('players');
+                  } else if (role === UserRole.TEAM_MANAGER && !selectedTeamId && userId) {
                     setSelectedTeamId(newTeamId);
                     dbService.linkUserToTeam(userId, newTeamId).catch(() => {});
+                    setView('players');
+                  } else {
+                    setView('dashboard');
                   }
-                  setView('players');
-                }} existingNames={teams.map(t => t.name)} />;
+                }} 
+                existingNames={teams.map(t => t.name)} 
+                onCancel={() => setView(role === UserRole.ADMIN ? 'admin' : 'dashboard')}
+              />;
               case 'schedule': return <MatchScheduler 
                 matches={matches} teams={teams} isAdmin={role === UserRole.ADMIN} role={role} 
                 selectedTeamId={selectedTeamId} onAddMatch={(m) => { setMatches(p => [...p, m]); dbService.saveMatch(m).catch(() => {}); }} 
@@ -421,7 +432,7 @@ const App: React.FC = () => {
                   setAds(ads.filter(a => a.id !== id));
                   dbService.deleteAd(id).catch(() => {});
                 }}
-                onRegisterTeam={() => {}} 
+                onRegisterTeam={() => setView('registration')}
                 onManageSquad={(tid) => { setSelectedTeamId(tid); setView('players'); }}
                 onReset={() => { if(confirm('Reset local data?')) { setTeams(INITIAL_TEAMS); setMatches(INITIAL_MATCHES); } }} 
                 onForceSync={forcePushToCloud}

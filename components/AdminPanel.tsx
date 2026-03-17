@@ -16,7 +16,7 @@ interface AdminPanelProps {
   onDeleteNews: (id: string) => void;
   onSaveAd: (ad: Ad) => void;
   onDeleteAd: (id: string) => void;
-  onRegisterTeam: (team: Omit<Team, 'id' | 'players'>) => void;
+  onRegisterTeam: () => void;
   onManageSquad: (teamId: string) => void;
   onReset: () => void;
   onImportState: (data: any) => void;
@@ -27,7 +27,7 @@ interface AdminPanelProps {
 }
 
 const AdminPanel: React.FC<AdminPanelProps> = ({ 
-  teams, news, ads, leagueSettings, onUpdateLeagueSettings, onUpdateTeam, onSaveNews, onDeleteNews, onSaveAd, onDeleteAd, onManageSquad, onReset, dbLogs, onForceSync, onImportMatches, onUpdateStandingOverrides 
+  teams, news, ads, leagueSettings, onUpdateLeagueSettings, onUpdateTeam, onSaveNews, onDeleteNews, onSaveAd, onDeleteAd, onRegisterTeam, onManageSquad, onReset, dbLogs, onForceSync, onImportMatches, onUpdateStandingOverrides 
 }) => {
   const [editingTeam, setEditingTeam] = useState<Team | null>(null);
   const [settingsForm, setSettingsForm] = useState<LeagueSettings>(leagueSettings);
@@ -531,7 +531,16 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
 
       {/* Teams Management */}
       <div className="bg-white p-8 rounded-[2rem] border border-gray-100 shadow-xl">
-        <SectionHeader title={`Manage Teams (${teams.length})`} icon="fa-shield-alt" sectionKey="members" />
+        <div className="flex justify-between items-center mb-4">
+          <SectionHeader title={`Manage Teams (${teams.length})`} icon="fa-shield-alt" sectionKey="members" />
+          <button 
+            onClick={onRegisterTeam}
+            className="bg-blue-600 text-white px-4 py-2 rounded-xl font-black uppercase text-[10px] tracking-widest hover:bg-blue-700 transition-all flex items-center space-x-2 shadow-lg"
+          >
+            <i className="fas fa-plus"></i>
+            <span>Register New Team</span>
+          </button>
+        </div>
         {expandedSections.members && (
           <div className="space-y-3 animate-in slide-in-from-top-2">
             {teams.map(team => (
