@@ -12,8 +12,9 @@ interface AdminPanelProps {
   users: User[];
   leagueSettings: LeagueSettings;
   onUpdateLeagueSettings: (settings: LeagueSettings) => void;
-  onUpdateMatch: (id: string, h: number, a: number, scorers: GoalScorer[], cards?: any[], refereeName?: string, refereeGrade?: string, isCompleted?: boolean, isLive?: boolean, date?: string, time?: string, venue?: string) => void;
+  onUpdateMatch: (id: string, h: number, a: number, scorers: GoalScorer[], cards?: any[], refereeName?: string, refereeGrade?: string, isCompleted?: boolean, isLive?: boolean, date?: string, time?: string, venue?: string, status?: 'scheduled' | 'live' | 'finished' | 'postponed') => void;
   onUpdateTeam?: (updatedTeam: Team) => void;
+  onApproveTeam?: (id: string) => void;
   onSaveNews: (item: NewsItem) => void;
   onDeleteNews: (id: string) => void;
   onDeleteNewsItems?: (ids: string[]) => void;
@@ -34,7 +35,7 @@ interface AdminPanelProps {
 }
 
 const AdminPanel: React.FC<AdminPanelProps> = ({ 
-  teams, matches, standings, news, ads, users, leagueSettings, onUpdateLeagueSettings, onUpdateTeam, onSaveNews, onDeleteNews, onDeleteNewsItems, onSaveAd, onDeleteAd, onDeleteAds, onRegisterTeam, onManageSquad, onReset, dbLogs, onForceSync, onImportMatches, onUpdateStandingOverrides, onUpdateUserStatus, onDeleteUser, onDeleteTeam 
+  teams, matches, standings, news, ads, users, leagueSettings, onUpdateLeagueSettings, onUpdateTeam, onApproveTeam, onSaveNews, onDeleteNews, onDeleteNewsItems, onSaveAd, onDeleteAd, onDeleteAds, onRegisterTeam, onManageSquad, onReset, dbLogs, onForceSync, onImportMatches, onUpdateStandingOverrides, onUpdateUserStatus, onDeleteUser, onDeleteTeam 
 }) => {
   const [editingTeam, setEditingTeam] = useState<Team | null>(null);
   const [settingsForm, setSettingsForm] = useState<LeagueSettings>(leagueSettings);
@@ -55,7 +56,8 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
     ads: false,
     users: true,
     fixtures: true,
-    standings: false
+    standings: false,
+    pendingTeams: true
   });
   
   const logoInputRef = useRef<HTMLInputElement>(null);
@@ -766,10 +768,46 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
         )}
       </div>
 
+      {/* Pending Team Registrations */}
+      {teams.some(t => !t.isApproved) && (
+        <div className="bg-amber-50 p-8 rounded-[2rem] border border-amber-100 shadow-xl">
+          <SectionHeader title={`Pending Team Approvals (${teams.filter(t => !t.isApproved).length})`} icon="fa-clock" sectionKey="pendingTeams" />
+          {expandedSections.pendingTeams && (
+            <div className="space-y-3 mt-6 animate-in slide-in-from-top-2">
+              {teams.filter(t => !t.isApproved).map(team => (
+                <div key={team.id} className="flex items-center justify-between p-4 bg-white rounded-2xl shadow-sm border border-amber-100">
+                  <div className="flex items-center space-x-4">
+                    <img src={team.logo} className="w-12 h-12 rounded-xl object-cover shadow-sm bg-white" alt="" />
+                    <div>
+                      <p className="font-black text-gray-900 leading-none mb-1">{team.name}</p>
+                      <p className="text-[10px] font-bold text-gray-400 uppercase">{team.manager} • {team.contact}</p>
+                    </div>
+                  </div>
+                  <div className="flex space-x-2">
+                    <button 
+                      onClick={() => onApproveTeam?.(team.id)} 
+                      className="bg-emerald-600 text-white px-4 py-2 rounded-xl font-black uppercase text-[10px] tracking-widest hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-100"
+                    >
+                      Approve
+                    </button>
+                    <button 
+                      onClick={() => onDeleteTeam?.(team.id)} 
+                      className="bg-red-50 text-red-600 px-4 py-2 rounded-xl font-black uppercase text-[10px] tracking-widest hover:bg-red-100 transition-all"
+                    >
+                      Reject
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Teams Management */}
       <div className="bg-white p-8 rounded-[2rem] border border-gray-100 shadow-xl">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
-          <SectionHeader title={`Manage Teams (${teams.length})`} icon="fa-shield-alt" sectionKey="members" />
+          <SectionHeader title={`Manage Teams (${teams.filter(t => t.isApproved).length})`} icon="fa-shield-alt" sectionKey="members" />
           <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
             <div className="relative flex-1 md:w-64">
               <i className="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 text-xs"></i>
@@ -793,6 +831,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
         {expandedSections.members && (
           <div className="space-y-3 animate-in slide-in-from-top-2">
             {teams
+              .filter(t => t.isApproved)
               .filter(t => t.name.toLowerCase().includes(teamSearch.toLowerCase()) || t.manager.toLowerCase().includes(teamSearch.toLowerCase()))
               .map(team => (
               <div key={team.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-2xl hover:bg-white hover:shadow-md transition-all group border border-transparent hover:border-blue-50">

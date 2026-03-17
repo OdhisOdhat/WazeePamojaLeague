@@ -12,7 +12,7 @@ interface MatchSchedulerProps {
   selectedTeamId: string | null;
   onAddMatch: (m: Match) => void;
   onImportMatches: (m: Match[]) => void;
-  onUpdateMatch: (id: string, h: number, a: number, scorers: GoalScorer[], cards?: CardEvent[], refereeName?: string, refereeGrade?: string, isCompleted?: boolean, isLive?: boolean, date?: string, time?: string, venue?: string, homeTeamId?: string, awayTeamId?: string) => void;
+  onUpdateMatch: (id: string, h: number, a: number, scorers: GoalScorer[], cards?: CardEvent[], refereeName?: string, refereeGrade?: string, isCompleted?: boolean, isLive?: boolean, date?: string, time?: string, venue?: string, status?: 'scheduled' | 'live' | 'finished' | 'postponed', homeTeamId?: string, awayTeamId?: string) => void;
   onDeleteMatch?: (id: string) => void;
   onDeleteMatches?: (ids: string[]) => void;
   filterTeamId?: string | null;
@@ -49,6 +49,7 @@ const MatchScheduler: React.FC<MatchSchedulerProps> = ({
   const [currentRefereeGrade, setCurrentRefereeGrade] = useState('');
   const [isMatchLive, setIsMatchLive] = useState(false);
   const [isMatchCompleted, setIsMatchCompleted] = useState(false);
+  const [matchStatus, setMatchStatus] = useState<'scheduled' | 'live' | 'finished' | 'postponed'>('scheduled');
   const [editDate, setEditDate] = useState('');
   const [editTime, setEditTime] = useState('');
   const [editVenue, setEditVenue] = useState('');
@@ -66,6 +67,16 @@ const MatchScheduler: React.FC<MatchSchedulerProps> = ({
     refereeName: '',
     refereeGrade: ''
   });
+
+  const isMatchTimeElapsed = (date: string, time: string) => {
+    if (!date || !time) return true;
+    try {
+      const matchDate = new Date(`${date}T${time}`);
+      return new Date() >= matchDate;
+    } catch (e) {
+      return true;
+    }
+  };
 
   const handleXlsUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -192,6 +203,7 @@ const MatchScheduler: React.FC<MatchSchedulerProps> = ({
     setCurrentRefereeGrade(match.refereeGrade || '');
     setIsMatchLive(match.isLive || false);
     setIsMatchCompleted(match.isCompleted || false);
+    setMatchStatus(match.status || (match.isCompleted ? 'finished' : match.isLive ? 'live' : 'scheduled'));
     setEditDate(match.date || '');
     setEditTime(match.time || '');
     setEditVenue(match.venue || '');
@@ -251,7 +263,23 @@ const MatchScheduler: React.FC<MatchSchedulerProps> = ({
   };
 
   const saveResult = (match: Match) => {
-    onUpdateMatch(match.id, scores.home, scores.away, currentScorers, currentCards, currentReferee, currentRefereeGrade, isMatchCompleted, isMatchLive, editDate, editTime, editVenue, editHomeTeamId, editAwayTeamId);
+    onUpdateMatch(
+      match.id, 
+      scores.home, 
+      scores.away, 
+      currentScorers, 
+      currentCards, 
+      currentReferee, 
+      currentRefereeGrade, 
+      matchStatus === 'finished', 
+      matchStatus === 'live', 
+      editDate, 
+      editTime, 
+      editVenue, 
+      matchStatus,
+      editHomeTeamId, 
+      editAwayTeamId
+    );
     setEditingMatchId(null);
   };
 
@@ -494,24 +522,38 @@ const MatchScheduler: React.FC<MatchSchedulerProps> = ({
                             <input type="number" min="0" className="w-12 text-center border-2 border-blue-300 rounded-lg font-black py-2 text-blue-700" value={scores.away} onChange={(e) => setScores({ ...scores, away: parseInt(e.target.value) || 0 })} />
                           </div>
                         </div>
-                        <div className="flex space-x-2">
+                        <div className="flex flex-wrap gap-2">
                           <button 
                             type="button"
-                            onClick={() => { setIsMatchLive(!isMatchLive); if(!isMatchLive) setIsMatchCompleted(false); }}
-                            className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border transition-all ${isMatchLive ? 'bg-red-500 text-white border-red-600' : 'bg-white text-gray-400 border-gray-200'}`}
+                            onClick={() => setMatchStatus('scheduled')}
+                            className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border transition-all ${matchStatus === 'scheduled' ? 'bg-blue-500 text-white border-blue-600' : 'bg-white text-gray-400 border-gray-200'}`}
                           >
-                            {isMatchLive ? 'Live Now' : 'Mark Live'}
+                            Scheduled
                           </button>
                           <button 
                             type="button"
-                            onClick={() => { setIsMatchCompleted(!isMatchCompleted); if(!isMatchCompleted) setIsMatchLive(false); }}
-                            className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border transition-all ${isMatchCompleted ? 'bg-green-500 text-white border-green-600' : 'bg-white text-gray-400 border-gray-200'}`}
+                            onClick={() => setMatchStatus('live')}
+                            className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border transition-all ${matchStatus === 'live' ? 'bg-red-500 text-white border-red-600' : 'bg-white text-gray-400 border-gray-200'}`}
                           >
-                            {isMatchCompleted ? 'Completed' : 'Mark Finished'}
+                            Live
+                          </button>
+                          <button 
+                            type="button"
+                            onClick={() => setMatchStatus('finished')}
+                            className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border transition-all ${matchStatus === 'finished' ? 'bg-green-500 text-white border-green-600' : 'bg-white text-gray-400 border-gray-200'}`}
+                          >
+                            Finished
+                          </button>
+                          <button 
+                            type="button"
+                            onClick={() => setMatchStatus('postponed')}
+                            className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border transition-all ${matchStatus === 'postponed' ? 'bg-amber-500 text-white border-amber-600' : 'bg-white text-gray-400 border-gray-200'}`}
+                          >
+                            Postponed
                           </button>
                         </div>
                       </div>
-                    ) : match.isLive ? (
+                    ) : match.status === 'live' || match.isLive ? (
                       <div className="flex flex-col items-center">
                         <div className="flex items-center space-x-4 bg-red-50 px-6 py-2 rounded-2xl border border-red-100 animate-pulse">
                           <span className="text-3xl font-black text-red-600">{match.homeScore || 0}</span>
@@ -520,7 +562,7 @@ const MatchScheduler: React.FC<MatchSchedulerProps> = ({
                         </div>
                         <span className="text-[9px] font-black text-red-500 mt-2 uppercase tracking-widest">LIVE NOW</span>
                       </div>
-                    ) : match.isCompleted ? (
+                    ) : match.status === 'finished' || match.isCompleted ? (
                       <div className="flex flex-col items-center">
                         <div className="flex items-center space-x-4 bg-gray-50 px-6 py-2 rounded-2xl border border-gray-100">
                           <span className="text-3xl font-black text-gray-900">{match.homeScore}</span>
@@ -528,6 +570,11 @@ const MatchScheduler: React.FC<MatchSchedulerProps> = ({
                           <span className="text-3xl font-black text-gray-900">{match.awayScore}</span>
                         </div>
                         <span className="text-[9px] font-black text-blue-400 mt-2 uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-opacity">View Match Center</span>
+                      </div>
+                    ) : match.status === 'postponed' ? (
+                      <div className="flex flex-col items-center">
+                        <div className="bg-amber-100 text-amber-700 px-4 py-1.5 rounded-full text-[10px] font-black tracking-widest uppercase border border-amber-200">POSTPONED</div>
+                        <span className="text-[8px] font-bold text-amber-500 mt-1 uppercase">To be rescheduled</span>
                       </div>
                     ) : (
                       <div className="bg-gray-100 text-gray-400 px-4 py-1.5 rounded-full text-[10px] font-black tracking-widest uppercase border border-gray-200">UPCOMING</div>
@@ -562,7 +609,18 @@ const MatchScheduler: React.FC<MatchSchedulerProps> = ({
                     </div>
                   ) : isEditing ? (
                     <div className="flex space-x-2" onClick={e => e.stopPropagation()}>
-                      <button onClick={() => saveResult(match)} className="bg-blue-600 text-white text-xs px-4 py-2 rounded-lg font-black uppercase">Save</button>
+                      <button 
+                        onClick={() => {
+                          if (!isAdmin && (matchStatus === 'finished' || matchStatus === 'live') && !isMatchTimeElapsed(match.date, match.time)) {
+                            alert('You can only enter results once the match time has elapsed.');
+                            return;
+                          }
+                          saveResult(match);
+                        }} 
+                        className="bg-blue-600 text-white text-xs px-4 py-2 rounded-lg font-black uppercase"
+                      >
+                        Save
+                      </button>
                       <button onClick={() => setEditingMatchId(null)} className="bg-white text-gray-500 text-xs px-4 py-2 rounded-lg font-black uppercase border border-gray-200">Cancel</button>
                     </div>
                   ) : match.isCompleted ? (

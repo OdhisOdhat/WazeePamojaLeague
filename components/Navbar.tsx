@@ -17,6 +17,7 @@ interface NavbarProps {
 
 const Navbar: React.FC<NavbarProps> = ({ currentView, setView, role, username, onLogout, selectedTeamId, teams, isSyncing, syncError, leagueSettings }) => {
   const managedTeam = teams.find(t => t.id === selectedTeamId);
+  const isTeamApproved = managedTeam?.isApproved ?? false;
 
   return (
     <nav className="bg-white shadow-sm border-b border-gray-100 sticky top-0 z-50">
@@ -43,7 +44,7 @@ const Navbar: React.FC<NavbarProps> = ({ currentView, setView, role, username, o
             <NavItem active={currentView === 'registration'} onClick={() => setView('registration')} icon="fa-user-plus" label="Join League" />
           )}
           
-          {role === UserRole.TEAM_MANAGER && selectedTeamId && (
+          {role === UserRole.TEAM_MANAGER && selectedTeamId && isTeamApproved && (
             <NavItem active={currentView === 'players'} onClick={() => setView('players')} icon="fa-users" label="My Squad" />
           )}
 

@@ -344,6 +344,20 @@ const App: React.FC = () => {
     }
   };
 
+  const handleApproveTeam = async (id: string) => {
+    try {
+      const team = teams.find(t => t.id === id);
+      if (team) {
+        const updatedTeam = { ...team, isApproved: true };
+        await dbService.saveTeam(updatedTeam);
+        setTeams(prev => prev.map(t => t.id === id ? updatedTeam : t));
+        addLog(`✅ Team ${team.name} approved`);
+      }
+    } catch (e) {
+      addLog(`❌ Failed to approve team: ${e instanceof Error ? e.message : 'Unknown error'}`);
+    }
+  };
+
   const standings = useMemo(() => {
     const table: Record<string, Standing> = {};
     teams.forEach(team => {
@@ -443,7 +457,7 @@ const App: React.FC = () => {
               case 'registration': return <TeamRegistration 
                 onRegister={(tData) => { 
                   const newTeamId = `t${Date.now()}`;
-                  const newTeam = { ...tData, id: newTeamId, players: [] };
+                  const newTeam = { ...tData, id: newTeamId, players: [], isApproved: role === UserRole.ADMIN };
                   setTeams(p => [...p, newTeam]);
                   dbService.saveTeam(newTeam).catch(() => {});
                   
@@ -486,7 +500,7 @@ const App: React.FC = () => {
                   });
                   alert(`${newMatches.length} matches processed.`);
                 }}
-                onUpdateMatch={(id, h, a, sc, c, ref, refG, isComp, isLive, date, time, venue, hId, aId) => {
+                onUpdateMatch={(id, h, a, sc, c, ref, refG, isComp, isLive, date, time, venue, status, hId, aId) => {
                   const updated = matches.map(m => m.id === id ? { 
                     ...m, 
                     homeScore: h, 
@@ -497,6 +511,7 @@ const App: React.FC = () => {
                     refereeGrade: refG, 
                     isCompleted: isComp !== undefined ? isComp : true,
                     isLive: isLive !== undefined ? isLive : false,
+                    status: status || m.status,
                     date: date || m.date,
                     time: time || m.time,
                     venue: venue || m.venue,
@@ -527,8 +542,28 @@ const App: React.FC = () => {
               case 'admin': return <AdminPanel 
                 teams={teams} matches={matches} standings={standings} news={news} ads={ads} users={users} leagueSettings={leagueSettings}
                 onUpdateLeagueSettings={(s) => { setLeagueSettings(s); dbService.saveSettings(s).catch(() => {}); }}
-                onUpdateMatch={() => {}} 
+                onUpdateMatch={(id, h, a, sc, c, ref, refG, isComp, isLive, date, time, venue, status) => {
+                  const updated = matches.map(m => m.id === id ? { 
+                    ...m, 
+                    homeScore: h, 
+                    awayScore: a, 
+                    scorers: sc, 
+                    cards: c, 
+                    refereeName: ref, 
+                    refereeGrade: refG, 
+                    isCompleted: isComp !== undefined ? isComp : true,
+                    isLive: isLive !== undefined ? isLive : false,
+                    status: status || m.status,
+                    date: date || m.date,
+                    time: time || m.time,
+                    venue: venue || m.venue
+                  } : m);
+                  setMatches(updated);
+                  const m = updated.find(u => u.id === id);
+                  if (m) dbService.saveMatch(m).catch(() => {});
+                }} 
                 onUpdateTeam={(t) => { setTeams(p => p.map(u => u.id === t.id ? t : u)); dbService.saveTeam(t).catch(() => {}); }}
+                onApproveTeam={handleApproveTeam}
                 onSaveNews={(item) => {
                   setNews(prev => {
                     const exists = prev.find(n => n.id === item.id);

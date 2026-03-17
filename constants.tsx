@@ -39,7 +39,8 @@ export const INITIAL_TEAMS: Team[] = [
     manager: 'Alex Ferguson',
     contact: 'alex@thunder.com',
     homeGround: 'Storm Arena',
-    players: []
+    players: [],
+    isApproved: true
   },
   {
     id: 't2',
@@ -48,7 +49,8 @@ export const INITIAL_TEAMS: Team[] = [
     manager: 'Pep Guardiola',
     contact: 'pep@lightning.com',
     homeGround: 'Voltage Stadium',
-    players: []
+    players: [],
+    isApproved: true
   },
   {
     id: 't3',
@@ -57,7 +59,8 @@ export const INITIAL_TEAMS: Team[] = [
     manager: 'Jurgen Klopp',
     contact: 'jurgen@gale.com',
     homeGround: 'Windy Park',
-    players: []
+    players: [],
+    isApproved: true
   }
 ];
 

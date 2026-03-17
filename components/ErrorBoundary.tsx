@@ -1,5 +1,5 @@
 
-import React, { ErrorInfo, ReactNode } from 'react';
+import React, { ErrorInfo, ReactNode } from 'https://esm.sh/react@19.0.0';
 
 interface Props {
   // Making children optional avoids "missing children" errors in some JSX compilers

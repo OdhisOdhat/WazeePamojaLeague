@@ -58,6 +58,8 @@ const Dashboard: React.FC<DashboardProps> = ({
   const nextMatch = liveMatches.length > 0 ? liveMatches[0] : upcomingMatches[0];
   const topTeams = standings.slice(0, 3);
   const isManagerWithoutTeam = role === UserRole.TEAM_MANAGER && !selectedTeamId;
+  const myTeam = selectedTeamId ? teams.find(t => t.id === selectedTeamId) : null;
+  const isTeamPendingApproval = role === UserRole.TEAM_MANAGER && myTeam && !myTeam.isApproved;
 
   const getTeam = (id: string) => teams.find(t => t.id === id);
 
@@ -104,6 +106,8 @@ const Dashboard: React.FC<DashboardProps> = ({
               <h1 className="text-4xl md:text-6xl font-black tracking-tight leading-[1.1] drop-shadow-lg">
                 {isManagerWithoutTeam ? (
                   <>Ready to lead your <span className="text-blue-300">own squad?</span></>
+                ) : isTeamPendingApproval ? (
+                  <>Team Registration <span className="text-amber-300">Pending Approval</span></>
                 ) : (
                   <>Welcome to <span className="text-blue-300">{leagueSettings.name}</span></>
                 )}
@@ -112,6 +116,8 @@ const Dashboard: React.FC<DashboardProps> = ({
               <p className="text-blue-50 text-lg opacity-90 max-w-2xl leading-relaxed drop-shadow-md">
                 {isManagerWithoutTeam 
                   ? "You've successfully joined as a manager. The next step is to register your club and begin building your championship-winning squad." 
+                  : isTeamPendingApproval
+                  ? `Your team "${myTeam?.name}" has been registered successfully. Please wait for an administrator to approve your registration before you can manage your squad and matches.`
                   : leagueSettings.description}
               </p>
 
@@ -124,6 +130,11 @@ const Dashboard: React.FC<DashboardProps> = ({
                     <i className="fas fa-plus-circle text-lg"></i>
                     <span>Register My Team Now</span>
                   </button>
+                ) : isTeamPendingApproval ? (
+                  <div className="bg-amber-500/20 backdrop-blur border border-amber-300/50 text-amber-100 px-8 py-4 rounded-[1.5rem] font-black uppercase text-xs tracking-widest flex items-center space-x-3">
+                    <i className="fas fa-clock animate-pulse"></i>
+                    <span>Awaiting Admin Approval</span>
+                  </div>
                 ) : (
                   <>
                     <button 

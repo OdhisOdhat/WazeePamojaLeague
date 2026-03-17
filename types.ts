@@ -19,6 +19,7 @@ export interface Team {
   contact: string;
   homeGround: string;
   players: Player[];
+  isApproved: boolean;
 }
 
 export interface NewsItem {
@@ -69,6 +70,7 @@ export interface Match {
   cards?: CardEvent[];
   isCompleted: boolean;
   isLive?: boolean;
+  status?: 'scheduled' | 'live' | 'finished' | 'postponed';
   matchWeek: number;
   refereeName?: string;
   refereeGrade?: string;
