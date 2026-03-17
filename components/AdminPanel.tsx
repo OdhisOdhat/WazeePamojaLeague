@@ -54,6 +54,28 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
 
   const [overrides, setOverrides] = useState<StandingOverride[]>(leagueSettings.standingOverrides || []);
 
+  const downloadFixturesTemplate = () => {
+    const data = [
+      { HomeTeam: 'Team A', AwayTeam: 'Team B', Date: '2024-05-20', Time: '15:00', Venue: 'Stadium X', Week: 1 },
+      { HomeTeam: 'Team C', AwayTeam: 'Team D', Date: '2024-05-21', Time: '16:30', Venue: 'Stadium Y', Week: 1 }
+    ];
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Fixtures");
+    XLSX.writeFile(wb, "LeaguePro_Fixtures_Template.xlsx");
+  };
+
+  const downloadResultsTemplate = () => {
+    const data = [
+      { HomeTeam: 'Team A', AwayTeam: 'Team B', HomeScore: 2, AwayScore: 1, Referee: 'John Doe', RefereeGrade: 'Level 1', Date: '2024-05-20' },
+      { HomeTeam: 'Team C', AwayTeam: 'Team D', HomeScore: 0, AwayScore: 0, Referee: 'Jane Smith', RefereeGrade: 'Level 2', Date: '2024-05-21' }
+    ];
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Results");
+    XLSX.writeFile(wb, "LeaguePro_Results_Template.xlsx");
+  };
+
   const handleXlsUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -61,50 +83,77 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
     const reader = new FileReader();
     reader.onload = (evt) => {
       try {
-        const bstr = evt.target?.result;
-        const wb = XLSX.read(bstr, { type: 'binary' });
+        const dataBuffer = evt.target?.result;
+        const wb = XLSX.read(dataBuffer, { type: 'array', cellDates: true });
         const wsname = wb.SheetNames[0];
         const ws = wb.Sheets[wsname];
         const data = XLSX.utils.sheet_to_json(ws) as any[];
 
+        console.log("Imported Raw Data (Admin):", data);
+
+        if (data.length === 0) {
+          alert("The Excel file seems to be empty.");
+          return;
+        }
+
         const importedMatches: Match[] = data.map((row, index) => {
-          const homeTeam = teams.find(t => t.name.toLowerCase() === (row.HomeTeam || row.home || '').toString().toLowerCase());
-          const awayTeam = teams.find(t => t.name.toLowerCase() === (row.AwayTeam || row.away || '').toString().toLowerCase());
+          const getVal = (keys: string[]) => {
+            const foundKey = Object.keys(row).find(k => keys.includes(k.trim().toLowerCase()));
+            return foundKey ? row[foundKey] : undefined;
+          };
+
+          const homeName = (getVal(['hometeam', 'home', 'team1']) || '').toString().trim();
+          const awayName = (getVal(['awayteam', 'away', 'team2']) || '').toString().trim();
+          
+          const homeTeam = teams.find(t => t.name.toLowerCase() === homeName.toLowerCase());
+          const awayTeam = teams.find(t => t.name.toLowerCase() === awayName.toLowerCase());
 
           if (!homeTeam || !awayTeam) {
-            console.warn(`Row ${index + 1}: Team not found. Home: ${row.HomeTeam}, Away: ${row.AwayTeam}`);
+            console.warn(`Row ${index + 1}: Team not found. Home: "${homeName}", Away: "${awayName}"`);
             return null;
           }
 
-          const isCompleted = row.HomeScore !== undefined && row.AwayScore !== undefined;
+          const homeScore = getVal(['homescore', 'score1', 'hscore']);
+          const awayScore = getVal(['awayscore', 'score2', 'ascore']);
+          const isCompleted = homeScore !== undefined && awayScore !== undefined;
+
+          let matchDate = getVal(['date', 'matchdate']);
+          if (matchDate instanceof Date) {
+            matchDate = matchDate.toISOString().split('T')[0];
+          } else if (typeof matchDate === 'number') {
+            const date = new Date(Math.round((matchDate - 25569) * 86400 * 1000));
+            matchDate = date.toISOString().split('T')[0];
+          } else {
+            matchDate = (matchDate || new Date().toISOString().split('T')[0]).toString();
+          }
 
           return {
             id: `m-xls-${Date.now()}-${index}`,
-            date: row.Date || new Date().toISOString().split('T')[0],
-            time: row.Time || '15:00',
-            venue: row.Venue || homeTeam.homeGround || 'TBD',
+            date: matchDate,
+            time: (getVal(['time', 'matchtime']) || '15:00').toString(),
+            venue: (getVal(['venue', 'stadium', 'pitch']) || homeTeam.homeGround || 'TBD').toString(),
             homeTeamId: homeTeam.id,
             awayTeamId: awayTeam.id,
-            homeScore: isCompleted ? parseInt(row.HomeScore) : undefined,
-            awayScore: isCompleted ? parseInt(row.AwayScore) : undefined,
+            homeScore: isCompleted ? parseInt(homeScore.toString()) : undefined,
+            awayScore: isCompleted ? parseInt(awayScore.toString()) : undefined,
             isCompleted: isCompleted,
-            matchWeek: parseInt(row.Week || row.MatchWeek || '1'),
-            refereeName: row.Referee || '',
-            refereeGrade: row.RefereeGrade || ''
+            matchWeek: parseInt((getVal(['week', 'matchweek', 'round']) || '1').toString()),
+            refereeName: (getVal(['referee', 'ref', 'official']) || '').toString(),
+            refereeGrade: (getVal(['refereegrade', 'grade']) || '').toString()
           };
         }).filter(m => m !== null) as Match[];
 
         if (importedMatches.length > 0) {
           onImportMatches(importedMatches);
         } else {
-          alert("No valid matches found in the Excel file. Please ensure team names match exactly.");
+          alert("No valid matches found. Please check that team names match exactly and columns are named correctly.");
         }
       } catch (err) {
-        console.error(err);
-        alert("Error parsing Excel file. Please check the format.");
+        console.error("XLSX Import Error (Admin):", err);
+        alert("Error parsing Excel file. Please ensure it is a valid .xlsx or .xls file.");
       }
     };
-    reader.readAsBinaryString(file);
+    reader.readAsArrayBuffer(file);
   };
 
   const updateOverride = (teamId: string, field: keyof StandingOverride, value: number) => {
@@ -231,6 +280,20 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                 >
                   <i className="fas fa-upload"></i>
                   <span>Upload Fixtures File</span>
+                </button>
+                <button 
+                  onClick={downloadFixturesTemplate}
+                  className="bg-white text-green-600 border-2 border-green-600 px-8 py-4 rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-green-50 transition-all flex items-center justify-center space-x-2"
+                >
+                  <i className="fas fa-download"></i>
+                  <span>Fixtures Template</span>
+                </button>
+                <button 
+                  onClick={downloadResultsTemplate}
+                  className="bg-white text-blue-600 border-2 border-blue-600 px-8 py-4 rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-blue-50 transition-all flex items-center justify-center space-x-2"
+                >
+                  <i className="fas fa-download"></i>
+                  <span>Results Template</span>
                 </button>
                 <input type="file" ref={xlsInputRef} className="hidden" accept=".xlsx, .xls" onChange={handleXlsUpload} />
               </div>

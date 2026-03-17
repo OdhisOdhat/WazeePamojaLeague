@@ -328,6 +328,27 @@ const App: React.FC = () => {
               case 'schedule': return <MatchScheduler 
                 matches={matches} teams={teams} isAdmin={role === UserRole.ADMIN} role={role} 
                 selectedTeamId={selectedTeamId} onAddMatch={(m) => { setMatches(p => [...p, m]); dbService.saveMatch(m).catch(() => {}); }} 
+                onImportMatches={(newMatches) => {
+                  setMatches(prevMatches => {
+                    const updatedMatches = [...prevMatches];
+                    newMatches.forEach(newM => {
+                      const existingIndex = updatedMatches.findIndex(m => 
+                        m.homeTeamId === newM.homeTeamId && 
+                        m.awayTeamId === newM.awayTeamId && 
+                        (m.date === newM.date || m.matchWeek === newM.matchWeek)
+                      );
+                      if (existingIndex !== -1) {
+                        updatedMatches[existingIndex] = { ...updatedMatches[existingIndex], ...newM, id: updatedMatches[existingIndex].id };
+                        dbService.saveMatch(updatedMatches[existingIndex]).catch(() => {});
+                      } else {
+                        updatedMatches.push(newM);
+                        dbService.saveMatch(newM).catch(() => {});
+                      }
+                    });
+                    return updatedMatches;
+                  });
+                  alert(`${newMatches.length} matches processed.`);
+                }}
                 onUpdateMatch={(id, h, a, sc, c, ref, refG, isComp, isLive, date, time, venue) => {
                   const updated = matches.map(m => m.id === id ? { 
                     ...m, 
@@ -355,10 +376,25 @@ const App: React.FC = () => {
                 onUpdateMatch={() => {}} 
                 onUpdateTeam={(t) => { setTeams(p => p.map(u => u.id === t.id ? t : u)); dbService.saveTeam(t).catch(() => {}); }}
                 onImportMatches={(newMatches) => {
-                  const updated = [...matches, ...newMatches];
-                  setMatches(updated);
-                  newMatches.forEach(m => dbService.saveMatch(m).catch(() => {}));
-                  alert(`${newMatches.length} matches imported successfully.`);
+                  setMatches(prevMatches => {
+                    const updatedMatches = [...prevMatches];
+                    newMatches.forEach(newM => {
+                      const existingIndex = updatedMatches.findIndex(m => 
+                        m.homeTeamId === newM.homeTeamId && 
+                        m.awayTeamId === newM.awayTeamId && 
+                        (m.date === newM.date || m.matchWeek === newM.matchWeek)
+                      );
+                      if (existingIndex !== -1) {
+                        updatedMatches[existingIndex] = { ...updatedMatches[existingIndex], ...newM, id: updatedMatches[existingIndex].id };
+                        dbService.saveMatch(updatedMatches[existingIndex]).catch(() => {});
+                      } else {
+                        updatedMatches.push(newM);
+                        dbService.saveMatch(newM).catch(() => {});
+                      }
+                    });
+                    return updatedMatches;
+                  });
+                  alert(`${newMatches.length} matches processed.`);
                 }}
                 onUpdateStandingOverrides={(overrides) => {
                   const updated = { ...leagueSettings, standingOverrides: overrides };

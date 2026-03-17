@@ -1,5 +1,6 @@
 
-import React, { useState, useMemo } from 'https://esm.sh/react@19.0.0';
+import React, { useState, useMemo, useRef } from 'https://esm.sh/react@19.0.0';
+import * as XLSX from 'https://esm.sh/xlsx@0.18.5';
 import { Match, Team, UserRole, GoalScorer, Player, CardEvent, LeagueSettings } from '../types.ts';
 import { DISCIPLINARY_ACTIONS } from '../constants.tsx';
 
@@ -10,6 +11,7 @@ interface MatchSchedulerProps {
   role: UserRole;
   selectedTeamId: string | null;
   onAddMatch: (m: Match) => void;
+  onImportMatches: (m: Match[]) => void;
   onUpdateMatch: (id: string, h: number, a: number, scorers: GoalScorer[], cards?: CardEvent[], refereeName?: string, refereeGrade?: string, isCompleted?: boolean, isLive?: boolean, date?: string, time?: string, venue?: string) => void;
   leagueSettings: LeagueSettings;
 }
@@ -21,10 +23,12 @@ const MatchScheduler: React.FC<MatchSchedulerProps> = ({
   role,
   selectedTeamId,
   onAddMatch, 
+  onImportMatches,
   onUpdateMatch,
   leagueSettings
 }) => {
   const [showAdd, setShowAdd] = useState(false);
+  const xlsInputRef = useRef<HTMLInputElement>(null);
   const [editingMatchId, setEditingMatchId] = useState<string | null>(null);
   const [viewingMatchId, setViewingMatchId] = useState<string | null>(null);
   const [scores, setScores] = useState({ home: 0, away: 0 });
@@ -49,6 +53,89 @@ const MatchScheduler: React.FC<MatchSchedulerProps> = ({
     refereeName: '',
     refereeGrade: ''
   });
+
+  const handleXlsUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      try {
+        const dataBuffer = evt.target?.result;
+        const wb = XLSX.read(dataBuffer, { type: 'array', cellDates: true });
+        const wsname = wb.SheetNames[0];
+        const ws = wb.Sheets[wsname];
+        const data = XLSX.utils.sheet_to_json(ws) as any[];
+
+        console.log("Imported Raw Data:", data);
+
+        if (data.length === 0) {
+          alert("The Excel file seems to be empty.");
+          return;
+        }
+
+        const importedMatches: Match[] = data.map((row, index) => {
+          // Normalize keys to handle case-insensitivity and common variations
+          const getVal = (keys: string[]) => {
+            const foundKey = Object.keys(row).find(k => keys.includes(k.trim().toLowerCase()));
+            return foundKey ? row[foundKey] : undefined;
+          };
+
+          const homeName = (getVal(['hometeam', 'home', 'team1']) || '').toString().trim();
+          const awayName = (getVal(['awayteam', 'away', 'team2']) || '').toString().trim();
+          
+          const homeTeam = teams.find(t => t.name.toLowerCase() === homeName.toLowerCase());
+          const awayTeam = teams.find(t => t.name.toLowerCase() === awayName.toLowerCase());
+
+          if (!homeTeam || !awayTeam) {
+            console.warn(`Row ${index + 1}: Team not found. Home: "${homeName}", Away: "${awayName}"`);
+            return null;
+          }
+
+          const homeScore = getVal(['homescore', 'score1', 'hscore']);
+          const awayScore = getVal(['awayscore', 'score2', 'ascore']);
+          const isCompleted = homeScore !== undefined && awayScore !== undefined;
+
+          // Handle Date
+          let matchDate = getVal(['date', 'matchdate']);
+          if (matchDate instanceof Date) {
+            matchDate = matchDate.toISOString().split('T')[0];
+          } else if (typeof matchDate === 'number') {
+            // Excel serial date
+            const date = new Date(Math.round((matchDate - 25569) * 86400 * 1000));
+            matchDate = date.toISOString().split('T')[0];
+          } else {
+            matchDate = (matchDate || new Date().toISOString().split('T')[0]).toString();
+          }
+
+          return {
+            id: `m-xls-${Date.now()}-${index}`,
+            date: matchDate,
+            time: (getVal(['time', 'matchtime']) || '15:00').toString(),
+            venue: (getVal(['venue', 'stadium', 'pitch']) || homeTeam.homeGround || 'TBD').toString(),
+            homeTeamId: homeTeam.id,
+            awayTeamId: awayTeam.id,
+            homeScore: isCompleted ? parseInt(homeScore.toString()) : undefined,
+            awayScore: isCompleted ? parseInt(awayScore.toString()) : undefined,
+            isCompleted: isCompleted,
+            matchWeek: parseInt((getVal(['week', 'matchweek', 'round']) || '1').toString()),
+            refereeName: (getVal(['referee', 'ref', 'official']) || '').toString(),
+            refereeGrade: (getVal(['refereegrade', 'grade']) || '').toString()
+          };
+        }).filter(m => m !== null) as Match[];
+
+        if (importedMatches.length > 0) {
+          onImportMatches(importedMatches);
+        } else {
+          alert("No valid matches found. Please check that team names match exactly and columns are named correctly (HomeTeam, AwayTeam).");
+        }
+      } catch (err) {
+        console.error("XLSX Import Error:", err);
+        alert("Error parsing Excel file. Please ensure it is a valid .xlsx or .xls file.");
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -180,13 +267,30 @@ const MatchScheduler: React.FC<MatchSchedulerProps> = ({
           <p className="text-gray-500">{leagueSettings.name} matches for {leagueSettings.season}.</p>
         </div>
         {isAdmin && (
-          <button 
-            onClick={() => setShowAdd(!showAdd)}
-            className="bg-blue-600 text-white px-6 py-3 rounded-xl font-bold shadow-lg shadow-blue-100 hover:bg-blue-700 transition-all flex items-center space-x-2 w-full md:w-auto justify-center"
-          >
-            <i className={`fas ${showAdd ? 'fa-times' : 'fa-plus'}`}></i>
-            <span>{showAdd ? 'Cancel' : 'Schedule New Match'}</span>
-          </button>
+          <div className="flex items-center space-x-3 w-full md:w-auto">
+            <button 
+              onClick={() => xlsInputRef.current?.click()}
+              className="bg-green-600 text-white px-6 py-3 rounded-xl font-bold shadow-lg shadow-green-100 hover:bg-green-700 transition-all flex items-center space-x-2 flex-1 md:flex-none justify-center"
+            >
+              <i className="fas fa-calendar-plus"></i>
+              <span>Import Fixtures</span>
+            </button>
+            <button 
+              onClick={() => xlsInputRef.current?.click()}
+              className="bg-blue-500 text-white px-6 py-3 rounded-xl font-bold shadow-lg shadow-blue-100 hover:bg-blue-600 transition-all flex items-center space-x-2 flex-1 md:flex-none justify-center"
+            >
+              <i className="fas fa-poll-h"></i>
+              <span>Upload Results</span>
+            </button>
+            <input type="file" ref={xlsInputRef} className="hidden" accept=".xlsx, .xls" onChange={handleXlsUpload} />
+            <button 
+              onClick={() => setShowAdd(!showAdd)}
+              className="bg-blue-600 text-white px-6 py-3 rounded-xl font-bold shadow-lg shadow-blue-100 hover:bg-blue-700 transition-all flex items-center space-x-2 flex-1 md:flex-none justify-center"
+            >
+              <i className={`fas ${showAdd ? 'fa-times' : 'fa-plus'}`}></i>
+              <span>{showAdd ? 'Cancel' : 'Schedule New Match'}</span>
+            </button>
+          </div>
         )}
       </div>
 
