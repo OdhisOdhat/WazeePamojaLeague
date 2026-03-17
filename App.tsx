@@ -41,6 +41,7 @@ const App: React.FC = () => {
   const [ads, setAds] = useState<Ad[]>([]);
   const [leagueSettings, setLeagueSettings] = useState<LeagueSettings>(DEFAULT_LEAGUE_SETTINGS);
   const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null);
+  const [viewingTeamId, setViewingTeamId] = useState<string | null>(null);
   const [isLoaded, setIsLoaded] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncError, setSyncError] = useState<string | null>(null);
@@ -108,6 +109,30 @@ const App: React.FC = () => {
       await db.execute({
         sql: "DELETE FROM matches WHERE id = ?",
         args: [id]
+      });
+    },
+    deleteMatches: async (ids: string[]) => {
+      if (ids.length === 0) return;
+      const placeholders = ids.map(() => "?").join(",");
+      await db.execute({
+        sql: `DELETE FROM matches WHERE id IN (${placeholders})`,
+        args: ids
+      });
+    },
+    deleteNewsItems: async (ids: string[]) => {
+      if (ids.length === 0) return;
+      const placeholders = ids.map(() => "?").join(",");
+      await db.execute({
+        sql: `DELETE FROM news WHERE id IN (${placeholders})`,
+        args: ids
+      });
+    },
+    deleteAds: async (ids: string[]) => {
+      if (ids.length === 0) return;
+      const placeholders = ids.map(() => "?").join(",");
+      await db.execute({
+        sql: `DELETE FROM ads WHERE id IN (${placeholders})`,
+        args: ids
       });
     },
     saveSettings: async (settings: LeagueSettings) => {
@@ -318,8 +343,8 @@ const App: React.FC = () => {
                   registerFn={dbService.register}
                 />
               );
-              case 'dashboard': return <Dashboard teams={teams} matches={matches} standings={standings} news={news} ads={ads} setView={setView} leagueSettings={leagueSettings} role={role} selectedTeamId={selectedTeamId} />;
-              case 'standings': return <StandingsTable standings={standings} teams={teams} leagueSettings={leagueSettings} />;
+              case 'dashboard': return <Dashboard teams={teams} matches={matches} standings={standings} news={news} ads={ads} setView={setView} leagueSettings={leagueSettings} role={role} selectedTeamId={selectedTeamId} onTeamClick={(tid) => { setViewingTeamId(tid); setView('schedule'); }} />;
+              case 'standings': return <StandingsTable standings={standings} teams={teams} leagueSettings={leagueSettings} onTeamClick={(tid) => { setViewingTeamId(tid); setView('schedule'); }} />;
               case 'registration': return <TeamRegistration 
                 onRegister={(tData) => { 
                   const newTeamId = `t${Date.now()}`;
@@ -393,6 +418,15 @@ const App: React.FC = () => {
                     dbService.deleteMatch(id).catch(() => {});
                   }
                 }}
+                onDeleteMatches={(ids) => {
+                  if (confirm(`Are you sure you want to delete ${ids.length} matches?`)) {
+                    setMatches(prev => prev.filter(m => !ids.includes(m.id)));
+                    dbService.deleteMatches(ids).catch(() => {});
+                  }
+                }}
+                filterTeamId={viewingTeamId}
+                onClearFilter={() => setViewingTeamId(null)}
+                onTeamClick={(tid) => setViewingTeamId(tid)}
                 leagueSettings={leagueSettings} 
               />;
               case 'admin': return <AdminPanel 
@@ -400,6 +434,38 @@ const App: React.FC = () => {
                 onUpdateLeagueSettings={(s) => { setLeagueSettings(s); dbService.saveSettings(s).catch(() => {}); }}
                 onUpdateMatch={() => {}} 
                 onUpdateTeam={(t) => { setTeams(p => p.map(u => u.id === t.id ? t : u)); dbService.saveTeam(t).catch(() => {}); }}
+                onSaveNews={(item) => {
+                  setNews(prev => {
+                    const exists = prev.find(n => n.id === item.id);
+                    if (exists) return prev.map(n => n.id === item.id ? item : n);
+                    return [item, ...prev];
+                  });
+                  dbService.saveNewsItem(item).catch(() => {});
+                }}
+                onDeleteNews={(id) => {
+                  setNews(prev => prev.filter(n => n.id !== id));
+                  dbService.deleteNewsItem(id).catch(() => {});
+                }}
+                onDeleteNewsItems={(ids) => {
+                  setNews(prev => prev.filter(n => !ids.includes(n.id)));
+                  dbService.deleteNewsItems(ids).catch(() => {});
+                }}
+                onSaveAd={(ad) => {
+                  setAds(prev => {
+                    const exists = prev.find(a => a.id === ad.id);
+                    if (exists) return prev.map(a => a.id === ad.id ? ad : a);
+                    return [...prev, ad];
+                  });
+                  dbService.saveAd(ad).catch(() => {});
+                }}
+                onDeleteAd={(id) => {
+                  setAds(prev => prev.filter(a => a.id !== id));
+                  dbService.deleteAd(id).catch(() => {});
+                }}
+                onDeleteAds={(ids) => {
+                  setAds(prev => prev.filter(a => !ids.includes(a.id)));
+                  dbService.deleteAds(ids).catch(() => {});
+                }}
                 onImportMatches={(newMatches) => {
                   setMatches(prevMatches => {
                     const updatedMatches = [...prevMatches];
@@ -425,26 +491,6 @@ const App: React.FC = () => {
                   const updated = { ...leagueSettings, standingOverrides: overrides };
                   setLeagueSettings(updated);
                   dbService.saveSettings(updated).catch(() => {});
-                }}
-                onSaveNews={(item) => {
-                  const exists = news.find(n => n.id === item.id);
-                  const updatedNews = exists ? news.map(n => n.id === item.id ? item : n) : [item, ...news];
-                  setNews(updatedNews);
-                  dbService.saveNewsItem(item).catch(() => {});
-                }}
-                onDeleteNews={(id) => {
-                  setNews(news.filter(n => n.id !== id));
-                  dbService.deleteNewsItem(id).catch(() => {});
-                }}
-                onSaveAd={(ad) => {
-                  const exists = ads.find(a => a.id === ad.id);
-                  const updatedAds = exists ? ads.map(a => a.id === ad.id ? ad : a) : [ad, ...ads];
-                  setAds(updatedAds);
-                  dbService.saveAd(ad).catch(() => {});
-                }}
-                onDeleteAd={(id) => {
-                  setAds(ads.filter(a => a.id !== id));
-                  dbService.deleteAd(id).catch(() => {});
                 }}
                 onRegisterTeam={() => setView('registration')}
                 onManageSquad={(tid) => { setSelectedTeamId(tid); setView('players'); }}

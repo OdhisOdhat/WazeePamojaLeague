@@ -6,9 +6,10 @@ interface StandingsTableProps {
   standings: Standing[];
   teams: Team[];
   leagueSettings: LeagueSettings;
+  onTeamClick?: (teamId: string) => void;
 }
 
-const StandingsTable: React.FC<StandingsTableProps> = ({ standings, teams, leagueSettings }) => {
+const StandingsTable: React.FC<StandingsTableProps> = ({ standings, teams, leagueSettings, onTeamClick }) => {
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-end">
@@ -42,12 +43,12 @@ const StandingsTable: React.FC<StandingsTableProps> = ({ standings, teams, leagu
               {standings.map((s, idx) => {
                 const team = teams.find(t => t.id === s.teamId);
                 return (
-                  <tr key={s.teamId} className="hover:bg-gray-50 transition-colors">
+                  <tr key={s.teamId} className="hover:bg-gray-50 transition-colors cursor-pointer" onClick={() => onTeamClick?.(s.teamId)}>
                     <td className="px-6 py-4 font-bold text-gray-500">{idx + 1}</td>
                     <td className="px-6 py-4">
                       <div className="flex items-center space-x-3">
                         <img src={team?.logo} alt="" className="w-8 h-8 rounded-full bg-gray-100 object-cover" />
-                        <span className="font-semibold text-gray-900">{s.teamName}</span>
+                        <span className="font-semibold text-gray-900 group-hover:text-blue-600">{s.teamName}</span>
                       </div>
                     </td>
                     <td className="px-4 py-4 text-center font-medium">{s.played}</td>

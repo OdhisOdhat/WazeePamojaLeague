@@ -14,6 +14,10 @@ interface MatchSchedulerProps {
   onImportMatches: (m: Match[]) => void;
   onUpdateMatch: (id: string, h: number, a: number, scorers: GoalScorer[], cards?: CardEvent[], refereeName?: string, refereeGrade?: string, isCompleted?: boolean, isLive?: boolean, date?: string, time?: string, venue?: string, homeTeamId?: string, awayTeamId?: string) => void;
   onDeleteMatch?: (id: string) => void;
+  onDeleteMatches?: (ids: string[]) => void;
+  filterTeamId?: string | null;
+  onClearFilter?: () => void;
+  onTeamClick?: (teamId: string) => void;
   leagueSettings: LeagueSettings;
 }
 
@@ -27,12 +31,17 @@ const MatchScheduler: React.FC<MatchSchedulerProps> = ({
   onImportMatches,
   onUpdateMatch,
   onDeleteMatch,
+  onDeleteMatches,
+  filterTeamId,
+  onClearFilter,
+  onTeamClick,
   leagueSettings
 }) => {
   const [showAdd, setShowAdd] = useState(false);
   const xlsInputRef = useRef<HTMLInputElement>(null);
   const [editingMatchId, setEditingMatchId] = useState<string | null>(null);
   const [viewingMatchId, setViewingMatchId] = useState<string | null>(null);
+  const [selectedMatchIds, setSelectedMatchIds] = useState<string[]>([]);
   const [scores, setScores] = useState({ home: 0, away: 0 });
   const [currentScorers, setCurrentScorers] = useState<GoalScorer[]>([]);
   const [currentCards, setCurrentCards] = useState<CardEvent[]>([]);
@@ -265,39 +274,84 @@ const MatchScheduler: React.FC<MatchSchedulerProps> = ({
     return events.sort((a, b) => a.minute - b.minute);
   }, [selectedMatch]);
 
+  const filteredMatches = useMemo(() => {
+    let result = [...matches];
+    if (filterTeamId) {
+      result = result.filter(m => m.homeTeamId === filterTeamId || m.awayTeamId === filterTeamId);
+    }
+    return result.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  }, [matches, filterTeamId]);
+
+  const toggleMatchSelection = (id: string) => {
+    setSelectedMatchIds(prev => 
+      prev.includes(id) ? prev.filter(mid => mid !== id) : [...prev, id]
+    );
+  };
+
+  const filteredTeam = filterTeamId ? getTeam(filterTeamId) : null;
+
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h2 className="text-3xl font-black text-gray-900 tracking-tight">Fixtures & Results</h2>
-          <p className="text-gray-500">{leagueSettings.name} matches for {leagueSettings.season}.</p>
+          <h2 className="text-3xl font-black text-gray-900 tracking-tight">
+            {filterTeamId ? `${filteredTeam?.name} Matches` : 'Fixtures & Results'}
+          </h2>
+          <p className="text-gray-500">
+            {filterTeamId 
+              ? `Viewing all past and upcoming matches for ${filteredTeam?.name}.`
+              : `${leagueSettings.name} matches for ${leagueSettings.season}.`}
+          </p>
+          {filterTeamId && (
+            <button 
+              onClick={onClearFilter}
+              className="mt-2 text-xs font-black text-blue-600 uppercase tracking-widest hover:underline flex items-center space-x-1"
+            >
+              <i className="fas fa-times-circle"></i>
+              <span>Clear Filter / View All Matches</span>
+            </button>
+          )}
         </div>
-        {isAdmin && (
-          <div className="flex items-center space-x-3 w-full md:w-auto">
+        <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+          {isAdmin && selectedMatchIds.length > 0 && (
             <button 
-              onClick={() => xlsInputRef.current?.click()}
-              className="bg-green-600 text-white px-6 py-3 rounded-xl font-bold shadow-lg shadow-green-100 hover:bg-green-700 transition-all flex items-center space-x-2 flex-1 md:flex-none justify-center"
+              onClick={() => {
+                onDeleteMatches?.(selectedMatchIds);
+                setSelectedMatchIds([]);
+              }}
+              className="bg-red-600 text-white px-6 py-3 rounded-xl font-bold shadow-lg shadow-red-100 hover:bg-red-700 transition-all flex items-center space-x-2 flex-1 md:flex-none justify-center"
             >
-              <i className="fas fa-calendar-plus"></i>
-              <span>Import Fixtures</span>
+              <i className="fas fa-trash-alt"></i>
+              <span>Delete Selected ({selectedMatchIds.length})</span>
             </button>
-            <button 
-              onClick={() => xlsInputRef.current?.click()}
-              className="bg-blue-500 text-white px-6 py-3 rounded-xl font-bold shadow-lg shadow-blue-100 hover:bg-blue-600 transition-all flex items-center space-x-2 flex-1 md:flex-none justify-center"
-            >
-              <i className="fas fa-poll-h"></i>
-              <span>Upload Results</span>
-            </button>
-            <input type="file" ref={xlsInputRef} className="hidden" accept=".xlsx, .xls" onChange={handleXlsUpload} />
-            <button 
-              onClick={() => setShowAdd(!showAdd)}
-              className="bg-blue-600 text-white px-6 py-3 rounded-xl font-bold shadow-lg shadow-blue-100 hover:bg-blue-700 transition-all flex items-center space-x-2 flex-1 md:flex-none justify-center"
-            >
-              <i className={`fas ${showAdd ? 'fa-times' : 'fa-plus'}`}></i>
-              <span>{showAdd ? 'Cancel' : 'Schedule New Match'}</span>
-            </button>
-          </div>
-        )}
+          )}
+          {isAdmin && (
+            <>
+              <button 
+                onClick={() => xlsInputRef.current?.click()}
+                className="bg-green-600 text-white px-6 py-3 rounded-xl font-bold shadow-lg shadow-green-100 hover:bg-green-700 transition-all flex items-center space-x-2 flex-1 md:flex-none justify-center"
+              >
+                <i className="fas fa-calendar-plus"></i>
+                <span>Import Fixtures</span>
+              </button>
+              <button 
+                onClick={() => xlsInputRef.current?.click()}
+                className="bg-blue-500 text-white px-6 py-3 rounded-xl font-bold shadow-lg shadow-blue-100 hover:bg-blue-600 transition-all flex items-center space-x-2 flex-1 md:flex-none justify-center"
+              >
+                <i className="fas fa-poll-h"></i>
+                <span>Upload Results</span>
+              </button>
+              <input type="file" ref={xlsInputRef} className="hidden" accept=".xlsx, .xls" onChange={handleXlsUpload} />
+              <button 
+                onClick={() => setShowAdd(!showAdd)}
+                className="bg-blue-600 text-white px-6 py-3 rounded-xl font-bold shadow-lg shadow-blue-100 hover:bg-blue-700 transition-all flex items-center space-x-2 flex-1 md:flex-none justify-center"
+              >
+                <i className={`fas ${showAdd ? 'fa-times' : 'fa-plus'}`}></i>
+                <span>{showAdd ? 'Cancel' : 'Schedule New Match'}</span>
+              </button>
+            </>
+          )}
+        </div>
       </div>
 
       {showAdd && (
@@ -373,18 +427,34 @@ const MatchScheduler: React.FC<MatchSchedulerProps> = ({
       )}
 
       <div className="space-y-6">
-        {matches.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()).map(match => {
+        {filteredMatches.length === 0 ? (
+          <div className="bg-white rounded-3xl border border-gray-100 p-12 text-center text-gray-400">
+            <i className="fas fa-search text-4xl mb-4 opacity-20"></i>
+            <p className="font-black text-gray-900 uppercase tracking-widest">No matches found</p>
+          </div>
+        ) : filteredMatches.map(match => {
           const isManagerMatch = !isAdmin && role === UserRole.TEAM_MANAGER && (match.homeTeamId === selectedTeamId || match.awayTeamId === selectedTeamId);
           const isEditing = editingMatchId === match.id;
           const homeTeam = getTeam(match.homeTeamId);
           const awayTeam = getTeam(match.awayTeamId);
+          const isSelected = selectedMatchIds.includes(match.id);
           
           return (
             <div 
               key={match.id} 
-              onClick={() => match.isCompleted && !isEditing && setViewingMatchId(match.id)}
-              className={`bg-white rounded-3xl border transition-all relative overflow-hidden flex flex-col ${match.isCompleted && !isEditing ? 'cursor-pointer hover:border-blue-300 hover:shadow-2xl' : ''} ${isManagerMatch ? 'border-blue-200 ring-4 ring-blue-50/50 shadow-xl' : 'border-gray-100'} p-6 group`}
+              onClick={() => match.isCompleted && !isEditing ? setViewingMatchId(match.id) : null}
+              className={`bg-white rounded-3xl border transition-all relative overflow-hidden flex flex-col ${match.isCompleted && !isEditing ? 'cursor-pointer hover:border-blue-300 hover:shadow-2xl' : ''} ${isManagerMatch ? 'border-blue-200 ring-4 ring-blue-50/50 shadow-xl' : 'border-gray-100'} p-6 group ${isSelected ? 'ring-4 ring-red-100 border-red-200' : ''}`}
             >
+              {isAdmin && (
+                <div 
+                  className="absolute top-4 right-4 z-10"
+                  onClick={(e) => { e.stopPropagation(); toggleMatchSelection(match.id); }}
+                >
+                  <div className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-all ${isSelected ? 'bg-red-500 border-red-500 text-white' : 'bg-white border-gray-200 text-transparent'}`}>
+                    <i className="fas fa-check text-[10px]"></i>
+                  </div>
+                </div>
+              )}
               <div className="flex flex-col md:flex-row items-center justify-between">
                 <div className="flex flex-col items-center md:items-start space-y-1 mb-4 md:mb-0 w-full md:w-1/4">
                   <div className="flex items-center space-x-2">
@@ -402,9 +472,12 @@ const MatchScheduler: React.FC<MatchSchedulerProps> = ({
                 </div>
 
                 <div className="flex items-center justify-center space-x-4 md:space-x-8 w-full md:w-2/4">
-                  <div className="flex flex-col items-center space-y-3 w-1/3 text-center">
+                  <div 
+                    className="flex flex-col items-center space-y-3 w-1/3 text-center cursor-pointer hover:scale-105 transition-transform"
+                    onClick={(e) => { e.stopPropagation(); onTeamClick?.(match.homeTeamId); }}
+                  >
                     <img src={homeTeam?.logo} alt="" className="w-14 h-14 rounded-full border-4 border-white shadow-md object-cover" />
-                    <span className="text-sm font-black text-gray-900 leading-tight">{homeTeam?.name}</span>
+                    <span className="text-sm font-black text-gray-900 leading-tight hover:text-blue-600">{homeTeam?.name}</span>
                   </div>
 
                   <div className="flex flex-col items-center justify-center px-4 min-w-[140px]">
@@ -461,11 +534,14 @@ const MatchScheduler: React.FC<MatchSchedulerProps> = ({
                     )}
                   </div>
 
-                  <div className="flex flex-col items-center space-y-3 w-1/3 text-center">
-                    <img src={awayTeam?.logo} alt="" className="w-14 h-14 rounded-full border-4 border-white shadow-md object-cover" />
-                    <span className="text-sm font-black text-gray-900 leading-tight">{awayTeam?.name}</span>
+                    <div 
+                      className="flex flex-col items-center space-y-3 w-1/3 text-center cursor-pointer hover:scale-105 transition-transform"
+                      onClick={(e) => { e.stopPropagation(); onTeamClick?.(match.awayTeamId); }}
+                    >
+                      <img src={awayTeam?.logo} alt="" className="w-14 h-14 rounded-full border-4 border-white shadow-md object-cover" />
+                      <span className="text-sm font-black text-gray-900 leading-tight hover:text-blue-600">{awayTeam?.name}</span>
+                    </div>
                   </div>
-                </div>
 
                 <div className="flex justify-center md:justify-end w-full md:w-1/4 mt-6 md:mt-0">
                   {canManageMatch(match) && !isEditing ? (

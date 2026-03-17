@@ -12,6 +12,7 @@ interface DashboardProps {
   leagueSettings: LeagueSettings;
   role?: UserRole;
   selectedTeamId?: string | null;
+  onTeamClick?: (teamId: string) => void;
 }
 
 const HERO_IMAGES = [
@@ -23,7 +24,7 @@ const HERO_IMAGES = [
 ];
 
 const Dashboard: React.FC<DashboardProps> = ({ 
-  teams, matches, standings, news, ads, setView, leagueSettings, role, selectedTeamId 
+  teams, matches, standings, news, ads, setView, leagueSettings, role, selectedTeamId, onTeamClick 
 }) => {
   const [selectedNews, setSelectedNews] = useState<NewsItem | null>(null);
   const [currentAdIdx, setCurrentAdIdx] = useState(0);
@@ -259,7 +260,7 @@ const Dashboard: React.FC<DashboardProps> = ({
           <h3 className="text-2xl font-black text-gray-900 mb-8 tracking-tight">Leaderboard</h3>
           <div className="space-y-4 flex-1">
             {topTeams.map((s, idx) => (
-              <div key={s.teamId} className="group flex items-center justify-between p-5 rounded-[2rem] bg-gray-50 border border-transparent hover:border-blue-100 hover:bg-white transition-all cursor-default">
+              <div key={s.teamId} className="group flex items-center justify-between p-5 rounded-[2rem] bg-gray-50 border border-transparent hover:border-blue-100 hover:bg-white transition-all cursor-pointer" onClick={() => onTeamClick?.(s.teamId)}>
                 <div className="flex items-center space-x-4">
                   <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-xs font-black shadow-sm ${
                     idx === 0 ? 'bg-gradient-to-br from-yellow-300 to-yellow-500 text-yellow-900' : 

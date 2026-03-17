@@ -14,8 +14,10 @@ interface AdminPanelProps {
   onUpdateTeam?: (updatedTeam: Team) => void;
   onSaveNews: (item: NewsItem) => void;
   onDeleteNews: (id: string) => void;
+  onDeleteNewsItems?: (ids: string[]) => void;
   onSaveAd: (ad: Ad) => void;
   onDeleteAd: (id: string) => void;
+  onDeleteAds?: (ids: string[]) => void;
   onRegisterTeam: () => void;
   onManageSquad: (teamId: string) => void;
   onReset: () => void;
@@ -27,10 +29,12 @@ interface AdminPanelProps {
 }
 
 const AdminPanel: React.FC<AdminPanelProps> = ({ 
-  teams, news, ads, leagueSettings, onUpdateLeagueSettings, onUpdateTeam, onSaveNews, onDeleteNews, onSaveAd, onDeleteAd, onRegisterTeam, onManageSquad, onReset, dbLogs, onForceSync, onImportMatches, onUpdateStandingOverrides 
+  teams, news, ads, leagueSettings, onUpdateLeagueSettings, onUpdateTeam, onSaveNews, onDeleteNews, onDeleteNewsItems, onSaveAd, onDeleteAd, onDeleteAds, onRegisterTeam, onManageSquad, onReset, dbLogs, onForceSync, onImportMatches, onUpdateStandingOverrides 
 }) => {
   const [editingTeam, setEditingTeam] = useState<Team | null>(null);
   const [settingsForm, setSettingsForm] = useState<LeagueSettings>(leagueSettings);
+  const [selectedNewsIds, setSelectedNewsIds] = useState<string[]>([]);
+  const [selectedAdIds, setSelectedAdIds] = useState<string[]>([]);
   const [newsForm, setNewsForm] = useState<Partial<NewsItem>>({
     title: '', content: '', imageUrl: '', important: false
   });
@@ -414,9 +418,31 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
              </div>
 
              <div className="space-y-3">
+                <div className="flex justify-between items-center mb-2">
+                   <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Manage Ads</p>
+                   {selectedAdIds.length > 0 && (
+                      <button 
+                        onClick={() => {
+                          if(confirm(`Delete ${selectedAdIds.length} ads?`)) {
+                            onDeleteAds?.(selectedAdIds);
+                            setSelectedAdIds([]);
+                          }
+                        }}
+                        className="text-[10px] font-black text-red-500 uppercase tracking-widest hover:underline"
+                      >
+                        Delete Selected ({selectedAdIds.length})
+                      </button>
+                   )}
+                </div>
                 {ads.map(ad => (
-                  <div key={ad.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-2xl border border-transparent hover:border-blue-100 transition-all group">
+                  <div key={ad.id} className={`flex items-center justify-between p-4 rounded-2xl border transition-all group ${selectedAdIds.includes(ad.id) ? 'bg-red-50 border-red-100' : 'bg-gray-50 border-transparent hover:border-blue-100'}`}>
                     <div className="flex items-center space-x-4">
+                      <input 
+                        type="checkbox" 
+                        className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500" 
+                        checked={selectedAdIds.includes(ad.id)}
+                        onChange={() => setSelectedAdIds(prev => prev.includes(ad.id) ? prev.filter(id => id !== ad.id) : [...prev, ad.id])}
+                      />
                       <img src={ad.imageUrl} className="w-12 h-12 rounded-lg object-cover bg-white" />
                       <div>
                         <p className="font-black text-gray-900 text-sm">{ad.title}</p>
@@ -479,11 +505,32 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                 </form>
              </div>
 
-             <div className="space-y-3">
-                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 mb-4">Manage Recent Posts</p>
+              <div className="space-y-3">
+                <div className="flex justify-between items-center mb-2">
+                   <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Manage Recent Posts</p>
+                   {selectedNewsIds.length > 0 && (
+                      <button 
+                        onClick={() => {
+                          if(confirm(`Delete ${selectedNewsIds.length} posts?`)) {
+                            onDeleteNewsItems?.(selectedNewsIds);
+                            setSelectedNewsIds([]);
+                          }
+                        }}
+                        className="text-[10px] font-black text-red-500 uppercase tracking-widest hover:underline"
+                      >
+                        Delete Selected ({selectedNewsIds.length})
+                      </button>
+                   )}
+                </div>
                 {news.map(item => (
-                  <div key={item.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-2xl border border-transparent hover:border-blue-100 transition-all group">
+                  <div key={item.id} className={`flex items-center justify-between p-4 rounded-2xl border transition-all group ${selectedNewsIds.includes(item.id) ? 'bg-red-50 border-red-100' : 'bg-gray-50 border-transparent hover:border-blue-100'}`}>
                     <div className="flex items-center space-x-4">
+                      <input 
+                        type="checkbox" 
+                        className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500" 
+                        checked={selectedNewsIds.includes(item.id)}
+                        onChange={() => setSelectedNewsIds(prev => prev.includes(item.id) ? prev.filter(id => id !== item.id) : [...prev, item.id])}
+                      />
                       <img src={item.imageUrl} className="w-12 h-12 rounded-lg object-cover bg-white" />
                       <div>
                         <p className="font-black text-gray-900 text-sm">{item.title}</p>
