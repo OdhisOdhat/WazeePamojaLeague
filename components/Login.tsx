@@ -30,7 +30,7 @@ const Login: React.FC<LoginProps> = ({ teams, onLogin, onBack, loginFn, register
         if (!registerFn) throw new Error('Registration unavailable');
 
         await registerFn(username, password, selectedTeamId);
-        setError('Registration successful! Please wait for admin approval before logging in.');
+        setError('Registration successful! Please wait for admin approval before logging in. Notify admin via 0739670966 for prompt approval.');
         setIsRegistering(false);
         setUsername('');
         setPassword('');
