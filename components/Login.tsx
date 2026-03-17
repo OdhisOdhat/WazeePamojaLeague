@@ -4,9 +4,9 @@ import { UserRole, Team } from '../types.ts';
 
 interface LoginProps {
   teams: Team[];
-  onLogin: (role: UserRole, teamId?: string, userId?: string) => void;
+  onLogin: (role: UserRole, teamId?: string, userId?: string, username?: string) => void;
   onBack: () => void;
-  loginFn: (u: string, p: string) => Promise<{role: UserRole, teamId?: string, id?: string}>;
+  loginFn: (u: string, p: string) => Promise<{role: UserRole, teamId?: string, id?: string, username?: string}>;
   registerFn?: (u: string, p: string, teamId: string) => Promise<any>;
 }
 
@@ -30,10 +30,10 @@ const Login: React.FC<LoginProps> = ({ teams, onLogin, onBack, loginFn, register
         if (!registerFn) throw new Error('Registration unavailable');
 
         const user = await registerFn(username, password, selectedTeamId);
-        onLogin(UserRole.TEAM_MANAGER, user.teamId, user.id);
+        onLogin(UserRole.TEAM_MANAGER, user.teamId, user.id, user.username);
       } else {
         const user = await loginFn(username, password);
-        onLogin(user.role, user.teamId, user.id);
+        onLogin(user.role, user.teamId, user.id, user.username);
       }
     } catch (err: any) {
       setError(err.message || 'Authentication failed. Please try again.');

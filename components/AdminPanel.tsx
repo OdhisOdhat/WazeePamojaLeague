@@ -1,6 +1,7 @@
 
 import React, { useState, useRef } from 'https://esm.sh/react@19.0.0';
-import { Team, Match, GoalScorer, LeagueSettings, NewsItem, Ad } from '../types.ts';
+import * as XLSX from 'https://esm.sh/xlsx@0.18.5';
+import { Team, Match, GoalScorer, LeagueSettings, NewsItem, Ad, StandingOverride } from '../types.ts';
 
 interface AdminPanelProps {
   teams: Team[];
@@ -19,12 +20,14 @@ interface AdminPanelProps {
   onManageSquad: (teamId: string) => void;
   onReset: () => void;
   onImportState: (data: any) => void;
+  onImportMatches: (matches: Match[]) => void;
+  onUpdateStandingOverrides: (overrides: StandingOverride[]) => void;
   dbLogs?: string[];
   onForceSync?: () => void;
 }
 
 const AdminPanel: React.FC<AdminPanelProps> = ({ 
-  teams, news, ads, leagueSettings, onUpdateLeagueSettings, onUpdateTeam, onSaveNews, onDeleteNews, onSaveAd, onDeleteAd, onManageSquad, onReset, dbLogs, onForceSync 
+  teams, news, ads, leagueSettings, onUpdateLeagueSettings, onUpdateTeam, onSaveNews, onDeleteNews, onSaveAd, onDeleteAd, onManageSquad, onReset, dbLogs, onForceSync, onImportMatches, onUpdateStandingOverrides 
 }) => {
   const [editingTeam, setEditingTeam] = useState<Team | null>(null);
   const [settingsForm, setSettingsForm] = useState<LeagueSettings>(leagueSettings);
@@ -38,13 +41,93 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
     branding: false,
     cloud: true,
     members: false,
-    news: true,
-    ads: true
+    news: false,
+    ads: false,
+    fixtures: true,
+    standings: false
   });
   
   const logoInputRef = useRef<HTMLInputElement>(null);
   const newsImgRef = useRef<HTMLInputElement>(null);
   const adImgRef = useRef<HTMLInputElement>(null);
+  const xlsInputRef = useRef<HTMLInputElement>(null);
+
+  const [overrides, setOverrides] = useState<StandingOverride[]>(leagueSettings.standingOverrides || []);
+
+  const handleXlsUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      try {
+        const bstr = evt.target?.result;
+        const wb = XLSX.read(bstr, { type: 'binary' });
+        const wsname = wb.SheetNames[0];
+        const ws = wb.Sheets[wsname];
+        const data = XLSX.utils.sheet_to_json(ws) as any[];
+
+        const importedMatches: Match[] = data.map((row, index) => {
+          const homeTeam = teams.find(t => t.name.toLowerCase() === (row.HomeTeam || row.home || '').toString().toLowerCase());
+          const awayTeam = teams.find(t => t.name.toLowerCase() === (row.AwayTeam || row.away || '').toString().toLowerCase());
+
+          if (!homeTeam || !awayTeam) {
+            console.warn(`Row ${index + 1}: Team not found. Home: ${row.HomeTeam}, Away: ${row.AwayTeam}`);
+            return null;
+          }
+
+          const isCompleted = row.HomeScore !== undefined && row.AwayScore !== undefined;
+
+          return {
+            id: `m-xls-${Date.now()}-${index}`,
+            date: row.Date || new Date().toISOString().split('T')[0],
+            time: row.Time || '15:00',
+            venue: row.Venue || homeTeam.homeGround || 'TBD',
+            homeTeamId: homeTeam.id,
+            awayTeamId: awayTeam.id,
+            homeScore: isCompleted ? parseInt(row.HomeScore) : undefined,
+            awayScore: isCompleted ? parseInt(row.AwayScore) : undefined,
+            isCompleted: isCompleted,
+            matchWeek: parseInt(row.Week || row.MatchWeek || '1'),
+            refereeName: row.Referee || '',
+            refereeGrade: row.RefereeGrade || ''
+          };
+        }).filter(m => m !== null) as Match[];
+
+        if (importedMatches.length > 0) {
+          onImportMatches(importedMatches);
+        } else {
+          alert("No valid matches found in the Excel file. Please ensure team names match exactly.");
+        }
+      } catch (err) {
+        console.error(err);
+        alert("Error parsing Excel file. Please check the format.");
+      }
+    };
+    reader.readAsBinaryString(file);
+  };
+
+  const updateOverride = (teamId: string, field: keyof StandingOverride, value: number) => {
+    const existing = overrides.find(o => o.teamId === teamId);
+    let newOverrides;
+    if (existing) {
+      newOverrides = overrides.map(o => o.teamId === teamId ? { ...o, [field]: value } : o);
+    } else {
+      newOverrides = [...overrides, {
+        teamId,
+        pointsAdjustment: 0,
+        goalsForAdjustment: 0,
+        goalsAgainstAdjustment: 0,
+        playedAdjustment: 0,
+        wonAdjustment: 0,
+        drawnAdjustment: 0,
+        lostAdjustment: 0,
+        [field]: value
+      }];
+    }
+    setOverrides(newOverrides);
+    onUpdateStandingOverrides(newOverrides);
+  };
 
   const toggleSection = (section: string) => setExpandedSections(prev => ({ ...prev, [section]: !prev[section] }));
 
@@ -122,6 +205,99 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
               <div className="space-y-1.5 h-40 overflow-y-auto custom-scrollbar font-mono text-[11px]">
                 {dbLogs?.map((log, i) => <div key={i} className="text-indigo-100 border-l border-indigo-500/30 pl-3 py-0.5">{log}</div>)}
               </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Fixtures Import Section */}
+      <div className="bg-white p-8 rounded-[2rem] border border-gray-100 shadow-xl">
+        <SectionHeader title="Fixtures & Results Import" icon="fa-file-excel" sectionKey="fixtures" />
+        {expandedSections.fixtures && (
+          <div className="space-y-6 animate-in slide-in-from-top-2">
+            <div className="bg-green-50/50 p-6 rounded-3xl border border-green-100/50">
+              <div className="flex items-center space-x-2 mb-4">
+                <i className="fas fa-info-circle text-green-600"></i>
+                <span className="text-[10px] font-black uppercase tracking-[0.2em] text-green-600">Excel Import Guide</span>
+              </div>
+              <p className="text-xs text-gray-600 leading-relaxed mb-4">
+                Upload an Excel file (.xlsx) with columns: <span className="font-bold">HomeTeam, AwayTeam, Date, Time, Venue, Week</span>. 
+                To import results, include <span className="font-bold">HomeScore</span> and <span className="font-bold">AwayScore</span>.
+              </p>
+              <div className="flex flex-col md:flex-row gap-4">
+                <button 
+                  onClick={() => xlsInputRef.current?.click()}
+                  className="bg-green-600 text-white px-8 py-4 rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-green-700 transition-all flex items-center justify-center space-x-2 shadow-lg shadow-green-100"
+                >
+                  <i className="fas fa-upload"></i>
+                  <span>Upload Fixtures File</span>
+                </button>
+                <input type="file" ref={xlsInputRef} className="hidden" accept=".xlsx, .xls" onChange={handleXlsUpload} />
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Standings Manual Adjustment */}
+      <div className="bg-white p-8 rounded-[2rem] border border-gray-100 shadow-xl">
+        <SectionHeader title="Standings Adjustments" icon="fa-table" sectionKey="standings" />
+        {expandedSections.standings && (
+          <div className="space-y-6 animate-in slide-in-from-top-2">
+            <p className="text-xs text-gray-500 mb-4 italic">Manually adjust points, goals, or matches played for specific teams. These values are added to the calculated standings.</p>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left">
+                <thead>
+                  <tr className="text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-100">
+                    <th className="pb-4">Team</th>
+                    <th className="pb-4 text-center">Pts +/-</th>
+                    <th className="pb-4 text-center">GF +/-</th>
+                    <th className="pb-4 text-center">GA +/-</th>
+                    <th className="pb-4 text-center">P +/-</th>
+                    <th className="pb-4 text-center">W +/-</th>
+                    <th className="pb-4 text-center">D +/-</th>
+                    <th className="pb-4 text-center">L +/-</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {teams.map(team => {
+                    const override = overrides.find(o => o.teamId === team.id) || {
+                      pointsAdjustment: 0, goalsForAdjustment: 0, goalsAgainstAdjustment: 0, playedAdjustment: 0, wonAdjustment: 0, drawnAdjustment: 0, lostAdjustment: 0
+                    };
+                    return (
+                      <tr key={team.id} className="group">
+                        <td className="py-4">
+                          <div className="flex items-center space-x-2">
+                            <img src={team.logo} className="w-6 h-6 rounded-full" alt="" />
+                            <span className="text-sm font-bold text-gray-900">{team.name}</span>
+                          </div>
+                        </td>
+                        <td className="py-4 text-center">
+                          <input type="number" className="w-16 text-center border border-gray-200 rounded-lg p-1 text-sm font-bold" value={override.pointsAdjustment} onChange={e => updateOverride(team.id, 'pointsAdjustment', parseInt(e.target.value) || 0)} />
+                        </td>
+                        <td className="py-4 text-center">
+                          <input type="number" className="w-16 text-center border border-gray-200 rounded-lg p-1 text-sm font-bold" value={override.goalsForAdjustment} onChange={e => updateOverride(team.id, 'goalsForAdjustment', parseInt(e.target.value) || 0)} />
+                        </td>
+                        <td className="py-4 text-center">
+                          <input type="number" className="w-16 text-center border border-gray-200 rounded-lg p-1 text-sm font-bold" value={override.goalsAgainstAdjustment} onChange={e => updateOverride(team.id, 'goalsAgainstAdjustment', parseInt(e.target.value) || 0)} />
+                        </td>
+                        <td className="py-4 text-center">
+                          <input type="number" className="w-16 text-center border border-gray-200 rounded-lg p-1 text-sm font-bold" value={override.playedAdjustment} onChange={e => updateOverride(team.id, 'playedAdjustment', parseInt(e.target.value) || 0)} />
+                        </td>
+                        <td className="py-4 text-center">
+                          <input type="number" className="w-16 text-center border border-gray-200 rounded-lg p-1 text-sm font-bold" value={override.wonAdjustment} onChange={e => updateOverride(team.id, 'wonAdjustment', parseInt(e.target.value) || 0)} />
+                        </td>
+                        <td className="py-4 text-center">
+                          <input type="number" className="w-16 text-center border border-gray-200 rounded-lg p-1 text-sm font-bold" value={override.drawnAdjustment} onChange={e => updateOverride(team.id, 'drawnAdjustment', parseInt(e.target.value) || 0)} />
+                        </td>
+                        <td className="py-4 text-center">
+                          <input type="number" className="w-16 text-center border border-gray-200 rounded-lg p-1 text-sm font-bold" value={override.lostAdjustment} onChange={e => updateOverride(team.id, 'lostAdjustment', parseInt(e.target.value) || 0)} />
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
           </div>
         )}

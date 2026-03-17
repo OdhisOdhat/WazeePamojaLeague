@@ -68,6 +68,7 @@ export interface Match {
   scorers?: GoalScorer[];
   cards?: CardEvent[];
   isCompleted: boolean;
+  isLive?: boolean;
   matchWeek: number;
   refereeName?: string;
   refereeGrade?: string;
@@ -86,11 +87,23 @@ export interface Standing {
   points: number;
 }
 
+export interface StandingOverride {
+  teamId: string;
+  pointsAdjustment: number;
+  goalsForAdjustment: number;
+  goalsAgainstAdjustment: number;
+  playedAdjustment: number;
+  wonAdjustment: number;
+  drawnAdjustment: number;
+  lostAdjustment: number;
+}
+
 export interface LeagueSettings {
   name: string;
   season: string;
   logo: string;
   description: string;
+  standingOverrides?: StandingOverride[];
 }
 
 export enum UserRole {

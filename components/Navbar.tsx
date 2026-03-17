@@ -6,6 +6,7 @@ interface NavbarProps {
   currentView: string;
   setView: (v: string) => void;
   role: UserRole;
+  username: string | null;
   onLogout: () => void;
   selectedTeamId: string | null;
   teams: Team[];
@@ -14,7 +15,7 @@ interface NavbarProps {
   leagueSettings: LeagueSettings;
 }
 
-const Navbar: React.FC<NavbarProps> = ({ currentView, setView, role, onLogout, selectedTeamId, teams, isSyncing, syncError, leagueSettings }) => {
+const Navbar: React.FC<NavbarProps> = ({ currentView, setView, role, username, onLogout, selectedTeamId, teams, isSyncing, syncError, leagueSettings }) => {
   const managedTeam = teams.find(t => t.id === selectedTeamId);
 
   return (
@@ -75,7 +76,7 @@ const Navbar: React.FC<NavbarProps> = ({ currentView, setView, role, onLogout, s
             <div className="flex items-center space-x-3">
               <div className="text-right hidden sm:block">
                 <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest leading-none">
-                  {role === UserRole.ADMIN ? 'Admin Session' : role === UserRole.GUEST ? 'Social Guest' : 'Manager Session'}
+                  {username || (role === UserRole.ADMIN ? 'Admin Session' : role === UserRole.GUEST ? 'Social Guest' : 'Manager Session')}
                 </p>
                 <p className="text-xs font-bold text-gray-700 truncate max-w-[120px]">
                   {role === UserRole.ADMIN ? 'System Administrator' : role === UserRole.GUEST ? 'Authenticated Viewer' : managedTeam?.name || 'Unlinked Manager'}

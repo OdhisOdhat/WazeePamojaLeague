@@ -49,11 +49,12 @@ const Dashboard: React.FC<DashboardProps> = ({
     };
   }, [activeAds.length]);
 
+  const liveMatches = matches.filter(m => m.isLive);
   const upcomingMatches = matches
-    .filter(m => !m.isCompleted)
+    .filter(m => !m.isCompleted && !m.isLive)
     .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
   
-  const nextMatch = upcomingMatches[0];
+  const nextMatch = liveMatches.length > 0 ? liveMatches[0] : upcomingMatches[0];
   const topTeams = standings.slice(0, 3);
   const isManagerWithoutTeam = role === UserRole.TEAM_MANAGER && !selectedTeamId;
 
@@ -197,21 +198,38 @@ const Dashboard: React.FC<DashboardProps> = ({
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 bg-white rounded-[3rem] border border-gray-100 shadow-sm p-8 hover:shadow-xl transition-all">
           <div className="flex justify-between items-center mb-8">
-            <h3 className="text-2xl font-black text-gray-900 tracking-tight">Featured Match</h3>
+            <h3 className="text-2xl font-black text-gray-900 tracking-tight">
+              {nextMatch?.isLive ? 'Live Match' : 'Featured Match'}
+            </h3>
             <button onClick={() => setView('schedule')} className="text-[10px] font-black text-blue-600 uppercase tracking-widest hover:underline">Full Schedule <i className="fas fa-arrow-right ml-1"></i></button>
           </div>
 
           {nextMatch ? (
-            <div className="flex flex-col md:flex-row items-center justify-between bg-gray-50 rounded-[2.5rem] p-10 border border-gray-100 group">
+            <div className={`flex flex-col md:flex-row items-center justify-between rounded-[2.5rem] p-10 border group transition-all ${
+              nextMatch.isLive ? 'bg-red-50 border-red-100 shadow-lg shadow-red-100/50' : 'bg-gray-50 border-gray-100'
+            }`}>
               <div className="flex flex-col items-center space-y-4 w-full md:w-1/3">
                 <img src={getTeam(nextMatch.homeTeamId)?.logo} className="w-24 h-24 rounded-full shadow-lg bg-white p-2 object-cover border-4 border-white" alt="" />
                 <span className="font-black text-gray-900 text-xl text-center leading-tight">{getTeam(nextMatch.homeTeamId)?.name}</span>
               </div>
               
               <div className="flex flex-col items-center justify-center py-8 md:py-0 w-full md:w-1/3">
-                <div className="bg-white px-6 py-2 rounded-full shadow-sm border border-gray-100 mb-4 text-xs font-black text-blue-600 uppercase tracking-[0.3em]">VS</div>
-                <div className="text-4xl font-black text-gray-900 tracking-tighter">{nextMatch.time}</div>
-                <div className="text-[10px] text-gray-400 font-black uppercase tracking-widest mt-2">{new Date(nextMatch.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'long' })}</div>
+                {nextMatch.isLive ? (
+                  <div className="flex flex-col items-center">
+                    <div className="bg-red-600 text-white px-4 py-1 rounded-full text-[10px] font-black uppercase tracking-[0.3em] mb-4 animate-pulse">Live</div>
+                    <div className="flex items-center space-x-6">
+                      <span className="text-5xl font-black text-red-600 tracking-tighter">{nextMatch.homeScore || 0}</span>
+                      <span className="text-red-300 font-bold text-2xl">:</span>
+                      <span className="text-5xl font-black text-red-600 tracking-tighter">{nextMatch.awayScore || 0}</span>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <div className="bg-white px-6 py-2 rounded-full shadow-sm border border-gray-100 mb-4 text-xs font-black text-blue-600 uppercase tracking-[0.3em]">VS</div>
+                    <div className="text-4xl font-black text-gray-900 tracking-tighter">{nextMatch.time}</div>
+                    <div className="text-[10px] text-gray-400 font-black uppercase tracking-widest mt-2">{new Date(nextMatch.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'long' })}</div>
+                  </>
+                )}
               </div>
 
               <div className="flex flex-col items-center space-y-4 w-full md:w-1/3">

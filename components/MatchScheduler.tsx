@@ -10,7 +10,7 @@ interface MatchSchedulerProps {
   role: UserRole;
   selectedTeamId: string | null;
   onAddMatch: (m: Match) => void;
-  onUpdateMatch: (id: string, h: number, a: number, scorers: GoalScorer[], cards?: CardEvent[], refereeName?: string, refereeGrade?: string) => void;
+  onUpdateMatch: (id: string, h: number, a: number, scorers: GoalScorer[], cards?: CardEvent[], refereeName?: string, refereeGrade?: string, isCompleted?: boolean, isLive?: boolean) => void;
   leagueSettings: LeagueSettings;
 }
 
@@ -32,6 +32,8 @@ const MatchScheduler: React.FC<MatchSchedulerProps> = ({
   const [currentCards, setCurrentCards] = useState<CardEvent[]>([]);
   const [currentReferee, setCurrentReferee] = useState('');
   const [currentRefereeGrade, setCurrentRefereeGrade] = useState('');
+  const [isMatchLive, setIsMatchLive] = useState(false);
+  const [isMatchCompleted, setIsMatchCompleted] = useState(false);
   const [manualScorerNames, setManualScorerNames] = useState<Record<string, string>>({});
   
   const [newMatch, setNewMatch] = useState<Partial<Match>>({
@@ -85,6 +87,8 @@ const MatchScheduler: React.FC<MatchSchedulerProps> = ({
     setCurrentCards(match.cards || []);
     setCurrentReferee(match.refereeName || '');
     setCurrentRefereeGrade(match.refereeGrade || '');
+    setIsMatchLive(match.isLive || false);
+    setIsMatchCompleted(match.isCompleted || false);
     setManualScorerNames({});
   };
 
@@ -139,7 +143,7 @@ const MatchScheduler: React.FC<MatchSchedulerProps> = ({
   };
 
   const saveResult = (match: Match) => {
-    onUpdateMatch(match.id, scores.home, scores.away, currentScorers, currentCards, currentReferee, currentRefereeGrade);
+    onUpdateMatch(match.id, scores.home, scores.away, currentScorers, currentCards, currentReferee, currentRefereeGrade, isMatchCompleted, isMatchLive);
     setEditingMatchId(null);
   };
 
@@ -289,16 +293,43 @@ const MatchScheduler: React.FC<MatchSchedulerProps> = ({
 
                   <div className="flex flex-col items-center justify-center px-4 min-w-[140px]">
                     {isEditing ? (
-                      <div className="flex items-center space-x-2" onClick={e => e.stopPropagation()}>
-                        <div className="flex flex-col items-center">
-                          <label className="text-[8px] font-bold text-gray-400 uppercase">Home</label>
-                          <input type="number" min="0" className="w-12 text-center border-2 border-blue-300 rounded-lg font-black py-2 text-blue-700" value={scores.home} onChange={(e) => setScores({ ...scores, home: parseInt(e.target.value) || 0 })} />
+                      <div className="flex flex-col items-center space-y-4" onClick={e => e.stopPropagation()}>
+                        <div className="flex items-center space-x-2">
+                          <div className="flex flex-col items-center">
+                            <label className="text-[8px] font-bold text-gray-400 uppercase">Home</label>
+                            <input type="number" min="0" className="w-12 text-center border-2 border-blue-300 rounded-lg font-black py-2 text-blue-700" value={scores.home} onChange={(e) => setScores({ ...scores, home: parseInt(e.target.value) || 0 })} />
+                          </div>
+                          <span className="font-bold text-blue-300 text-lg mt-4">:</span>
+                          <div className="flex flex-col items-center">
+                            <label className="text-[8px] font-bold text-gray-400 uppercase">Away</label>
+                            <input type="number" min="0" className="w-12 text-center border-2 border-blue-300 rounded-lg font-black py-2 text-blue-700" value={scores.away} onChange={(e) => setScores({ ...scores, away: parseInt(e.target.value) || 0 })} />
+                          </div>
                         </div>
-                        <span className="font-bold text-blue-300 text-lg mt-4">:</span>
-                        <div className="flex flex-col items-center">
-                          <label className="text-[8px] font-bold text-gray-400 uppercase">Away</label>
-                          <input type="number" min="0" className="w-12 text-center border-2 border-blue-300 rounded-lg font-black py-2 text-blue-700" value={scores.away} onChange={(e) => setScores({ ...scores, away: parseInt(e.target.value) || 0 })} />
+                        <div className="flex space-x-2">
+                          <button 
+                            type="button"
+                            onClick={() => { setIsMatchLive(!isMatchLive); if(!isMatchLive) setIsMatchCompleted(false); }}
+                            className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border transition-all ${isMatchLive ? 'bg-red-500 text-white border-red-600' : 'bg-white text-gray-400 border-gray-200'}`}
+                          >
+                            {isMatchLive ? 'Live Now' : 'Mark Live'}
+                          </button>
+                          <button 
+                            type="button"
+                            onClick={() => { setIsMatchCompleted(!isMatchCompleted); if(!isMatchCompleted) setIsMatchLive(false); }}
+                            className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border transition-all ${isMatchCompleted ? 'bg-green-500 text-white border-green-600' : 'bg-white text-gray-400 border-gray-200'}`}
+                          >
+                            {isMatchCompleted ? 'Completed' : 'Mark Finished'}
+                          </button>
                         </div>
+                      </div>
+                    ) : match.isLive ? (
+                      <div className="flex flex-col items-center">
+                        <div className="flex items-center space-x-4 bg-red-50 px-6 py-2 rounded-2xl border border-red-100 animate-pulse">
+                          <span className="text-3xl font-black text-red-600">{match.homeScore || 0}</span>
+                          <span className="text-red-300 font-bold text-xl">:</span>
+                          <span className="text-3xl font-black text-red-600">{match.awayScore || 0}</span>
+                        </div>
+                        <span className="text-[9px] font-black text-red-500 mt-2 uppercase tracking-widest">LIVE NOW</span>
                       </div>
                     ) : match.isCompleted ? (
                       <div className="flex flex-col items-center">

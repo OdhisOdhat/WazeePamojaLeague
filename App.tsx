@@ -34,6 +34,7 @@ const App: React.FC = () => {
   const [view, setView] = useState<string>('dashboard');
   const [role, setRole] = useState<UserRole>(UserRole.PUBLIC);
   const [userId, setUserId] = useState<string | null>(null);
+  const [username, setUsername] = useState<string | null>(null);
   const [teams, setTeams] = useState<Team[]>([]);
   const [matches, setMatches] = useState<Match[]>([]);
   const [news, setNews] = useState<NewsItem[]>([]);
@@ -125,7 +126,7 @@ const App: React.FC = () => {
       };
     },
     login: async (username: string, password: string) => {
-      if (username === 'admin' && password === 'admin123') return { role: UserRole.ADMIN, id: 'u-admin' };
+      if (username === 'admin' && password === 'admin123') return { role: UserRole.ADMIN, id: 'u-admin', username: 'admin' };
       const res = await db.execute({
         sql: "SELECT id, role, teamId FROM users WHERE username = ? AND password = ?",
         args: [username, password]
@@ -133,7 +134,8 @@ const App: React.FC = () => {
       if (res.rows.length > 0) return { 
         id: res.rows[0].id as string, 
         role: res.rows[0].role as UserRole, 
-        teamId: res.rows[0].teamId as string 
+        teamId: res.rows[0].teamId as string,
+        username: username
       };
       throw new Error("Invalid credentials");
     },
@@ -174,6 +176,7 @@ const App: React.FC = () => {
         const session = JSON.parse(savedSession);
         setRole(session.role);
         setUserId(session.userId || null);
+        setUsername(session.username || null);
         setSelectedTeamId(session.teamId || null);
       }
       setIsLoaded(true);
@@ -208,7 +211,7 @@ const App: React.FC = () => {
       localStorage.setItem(STORAGE_KEYS.NEWS, JSON.stringify(news));
       localStorage.setItem(STORAGE_KEYS.ADS, JSON.stringify(ads));
       if (role !== UserRole.PUBLIC) {
-        localStorage.setItem(STORAGE_KEYS.SESSION, JSON.stringify({ role, userId, teamId: selectedTeamId }));
+        localStorage.setItem(STORAGE_KEYS.SESSION, JSON.stringify({ role, userId, username, teamId: selectedTeamId }));
       } else {
         localStorage.removeItem(STORAGE_KEYS.SESSION);
       }
@@ -235,6 +238,24 @@ const App: React.FC = () => {
       home.goalDifference = home.goalsFor - home.goalsAgainst;
       away.goalDifference = away.goalsFor - away.goalsAgainst;
     });
+
+    // Apply Overrides
+    if (leagueSettings.standingOverrides) {
+      leagueSettings.standingOverrides.forEach(override => {
+        const s = table[override.teamId];
+        if (s) {
+          s.points += override.pointsAdjustment || 0;
+          s.goalsFor += override.goalsForAdjustment || 0;
+          s.goalsAgainst += override.goalsAgainstAdjustment || 0;
+          s.played += override.playedAdjustment || 0;
+          s.won += override.wonAdjustment || 0;
+          s.drawn += override.drawnAdjustment || 0;
+          s.lost += override.lostAdjustment || 0;
+          s.goalDifference = s.goalsFor - s.goalsAgainst;
+        }
+      });
+    }
+
     return Object.values(table).sort((a, b) => b.points !== a.points ? b.points - a.points : b.goalDifference !== a.goalDifference ? b.goalDifference - a.goalDifference : b.goalsFor - a.goalsFor);
   }, [teams, matches]);
 
@@ -260,7 +281,8 @@ const App: React.FC = () => {
     <div className="min-h-screen flex flex-col selection:bg-blue-100 selection:text-blue-900">
       <Navbar 
         currentView={view} setView={setView} role={role} 
-        onLogout={() => { setRole(UserRole.PUBLIC); setUserId(null); setSelectedTeamId(null); setView('dashboard'); }} 
+        username={username}
+        onLogout={() => { setRole(UserRole.PUBLIC); setUserId(null); setUsername(null); setSelectedTeamId(null); setView('dashboard'); }} 
         selectedTeamId={selectedTeamId} teams={teams} 
         isSyncing={isSyncing} syncError={syncError} leagueSettings={leagueSettings}
       />
@@ -278,7 +300,13 @@ const App: React.FC = () => {
               case 'login': return (
                 <Login 
                   teams={teams} 
-                  onLogin={(r, t, uid) => { setRole(r); setSelectedTeamId(t || null); setUserId(uid || null); setView('dashboard'); }} 
+                  onLogin={(r, t, uid, uname) => { 
+                    setRole(r); 
+                    setSelectedTeamId(t || null); 
+                    setUserId(uid || null); 
+                    setUsername(uname || null);
+                    setView('dashboard'); 
+                  }} 
                   onBack={() => setView('dashboard')} 
                   loginFn={dbService.login} 
                   registerFn={dbService.register}
@@ -300,8 +328,18 @@ const App: React.FC = () => {
               case 'schedule': return <MatchScheduler 
                 matches={matches} teams={teams} isAdmin={role === UserRole.ADMIN} role={role} 
                 selectedTeamId={selectedTeamId} onAddMatch={(m) => { setMatches(p => [...p, m]); dbService.saveMatch(m).catch(() => {}); }} 
-                onUpdateMatch={(id, h, a, sc, c, ref, refG) => {
-                  const updated = matches.map(m => m.id === id ? { ...m, homeScore: h, awayScore: a, scorers: sc, cards: c, refereeName: ref, refereeGrade: refG, isCompleted: true } : m);
+                onUpdateMatch={(id, h, a, sc, c, ref, refG, isComp, isLive) => {
+                  const updated = matches.map(m => m.id === id ? { 
+                    ...m, 
+                    homeScore: h, 
+                    awayScore: a, 
+                    scorers: sc, 
+                    cards: c, 
+                    refereeName: ref, 
+                    refereeGrade: refG, 
+                    isCompleted: isComp !== undefined ? isComp : true,
+                    isLive: isLive !== undefined ? isLive : false
+                  } : m);
                   setMatches(updated);
                   const m = updated.find(u => u.id === id);
                   if (m) dbService.saveMatch(m).catch(() => {});
@@ -313,6 +351,17 @@ const App: React.FC = () => {
                 onUpdateLeagueSettings={(s) => { setLeagueSettings(s); dbService.saveSettings(s).catch(() => {}); }}
                 onUpdateMatch={() => {}} 
                 onUpdateTeam={(t) => { setTeams(p => p.map(u => u.id === t.id ? t : u)); dbService.saveTeam(t).catch(() => {}); }}
+                onImportMatches={(newMatches) => {
+                  const updated = [...matches, ...newMatches];
+                  setMatches(updated);
+                  newMatches.forEach(m => dbService.saveMatch(m).catch(() => {}));
+                  alert(`${newMatches.length} matches imported successfully.`);
+                }}
+                onUpdateStandingOverrides={(overrides) => {
+                  const updated = { ...leagueSettings, standingOverrides: overrides };
+                  setLeagueSettings(updated);
+                  dbService.saveSettings(updated).catch(() => {});
+                }}
                 onSaveNews={(item) => {
                   const exists = news.find(n => n.id === item.id);
                   const updatedNews = exists ? news.map(n => n.id === item.id ? item : n) : [item, ...news];
