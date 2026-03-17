@@ -54,6 +54,9 @@ const Navbar: React.FC<NavbarProps> = ({ currentView, setView, role, username, o
           {role === UserRole.ADMIN && (
             <NavItem active={currentView === 'admin'} onClick={() => setView('admin')} icon="fa-cog" label="Control Panel" />
           )}
+
+          <NavItem active={false} onClick={() => { setView('dashboard'); setTimeout(() => document.getElementById('support-sections')?.scrollIntoView({ behavior: 'smooth' }), 100); }} icon="fa-server text-blue-400" label="Support App" />
+          <NavItem active={false} onClick={() => { setView('dashboard'); setTimeout(() => document.getElementById('support-sections')?.scrollIntoView({ behavior: 'smooth' }), 100); }} icon="fa-heart text-red-500" label="Donate League" />
         </div>
 
         <div className="flex items-center space-x-4 mt-4 md:mt-0">

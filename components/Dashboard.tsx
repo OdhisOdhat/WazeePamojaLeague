@@ -137,6 +137,16 @@ const Dashboard: React.FC<DashboardProps> = ({
                     >
                       View Fixtures
                     </button>
+                    <button 
+                      onClick={() => {
+                        const el = document.getElementById('support-sections');
+                        el?.scrollIntoView({ behavior: 'smooth' });
+                      }}
+                      className="bg-red-600 text-white px-8 py-4 rounded-[1.5rem] font-black uppercase text-xs tracking-widest hover:bg-red-700 transition-all shadow-xl flex items-center space-x-2"
+                    >
+                      <i className="fas fa-heart"></i>
+                      <span>Donate</span>
+                    </button>
                   </>
                 )}
               </div>
@@ -392,6 +402,69 @@ const Dashboard: React.FC<DashboardProps> = ({
           </div>
         </div>
       )}
+      {/* Support & Donate Sections */}
+      <div id="support-sections" className="grid grid-cols-1 lg:grid-cols-2 gap-8 scroll-mt-24">
+        {/* App Support - Logistics */}
+        <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-[3.5rem] p-10 text-white shadow-2xl relative overflow-hidden group">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/10 rounded-full -translate-y-1/2 translate-x-1/2 blur-2xl group-hover:scale-150 transition-transform duration-1000"></div>
+          
+          <div className="relative z-10 space-y-6">
+            <div className="inline-flex items-center space-x-3 px-4 py-2 rounded-full bg-white/10 backdrop-blur-md border border-white/20">
+              <i className="fas fa-server text-blue-400"></i>
+              <span className="text-[10px] font-black uppercase tracking-[0.3em]">App Logistics</span>
+            </div>
+            
+            <h3 className="text-3xl font-black tracking-tight">Support App <br/><span className="text-blue-400">Infrastructure</span></h3>
+            <p className="text-gray-400 text-sm leading-relaxed">
+              Help us cover the monthly server, hosting, and database costs to keep this platform fast and reliable for everyone.
+            </p>
+
+            <div className="grid grid-cols-2 gap-4 pt-4">
+              <div className="bg-white/5 border border-white/10 p-4 rounded-2xl">
+                <p className="text-[8px] font-black uppercase tracking-widest text-gray-500 mb-1">Paybill</p>
+                <p className="text-xl font-black tracking-tighter">714777</p>
+              </div>
+              <div className="bg-white/5 border border-white/10 p-4 rounded-2xl">
+                <p className="text-[8px] font-black uppercase tracking-widest text-gray-500 mb-1">Account</p>
+                <p className="text-xl font-black tracking-tighter">0727774129</p>
+              </div>
+            </div>
+            
+            <div className="text-[10px] font-bold text-blue-400/50 italic">Reference: "APP SUPPORT"</div>
+          </div>
+        </div>
+
+        {/* League Donation - Growth */}
+        <div className="bg-gradient-to-br from-blue-600 to-indigo-700 rounded-[3.5rem] p-10 text-white shadow-2xl relative overflow-hidden group">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2 blur-2xl group-hover:scale-150 transition-transform duration-1000"></div>
+          
+          <div className="relative z-10 space-y-6">
+            <div className="inline-flex items-center space-x-3 px-4 py-2 rounded-full bg-white/20 backdrop-blur-md border border-white/30">
+              <i className="fas fa-trophy text-yellow-400 animate-bounce"></i>
+              <span className="text-[10px] font-black uppercase tracking-[0.3em]">League Growth</span>
+            </div>
+            
+            <h3 className="text-3xl font-black tracking-tight">Donate to <br/><span className="text-blue-200">The League</span></h3>
+            <p className="text-blue-100 text-sm leading-relaxed">
+              Directly support the league's operations, including pitch maintenance, equipment, and prize pools for the winners.
+            </p>
+
+            <div className="grid grid-cols-2 gap-4 pt-4">
+              <div className="bg-white/20 border border-white/30 p-4 rounded-2xl">
+                <p className="text-[8px] font-black uppercase tracking-widest text-blue-200 mb-1">Paybill</p>
+                <p className="text-xl font-black tracking-tighter">00000</p>
+              </div>
+              <div className="bg-white/20 border border-white/30 p-4 rounded-2xl">
+                <p className="text-[8px] font-black uppercase tracking-widest text-blue-200 mb-1">Account</p>
+                <p className="text-xl font-black tracking-tighter">0000000</p>
+              </div>
+            </div>
+
+            <div className="text-[10px] font-bold text-white/50 italic">Reference: "LEAGUE DONATE"</div>
+          </div>
+        </div>
+      </div>
+
       <style>{`
         @keyframes slow-zoom {
           from { transform: scale(1); }
