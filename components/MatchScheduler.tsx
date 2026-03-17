@@ -12,7 +12,8 @@ interface MatchSchedulerProps {
   selectedTeamId: string | null;
   onAddMatch: (m: Match) => void;
   onImportMatches: (m: Match[]) => void;
-  onUpdateMatch: (id: string, h: number, a: number, scorers: GoalScorer[], cards?: CardEvent[], refereeName?: string, refereeGrade?: string, isCompleted?: boolean, isLive?: boolean, date?: string, time?: string, venue?: string) => void;
+  onUpdateMatch: (id: string, h: number, a: number, scorers: GoalScorer[], cards?: CardEvent[], refereeName?: string, refereeGrade?: string, isCompleted?: boolean, isLive?: boolean, date?: string, time?: string, venue?: string, homeTeamId?: string, awayTeamId?: string) => void;
+  onDeleteMatch?: (id: string) => void;
   leagueSettings: LeagueSettings;
 }
 
@@ -25,6 +26,7 @@ const MatchScheduler: React.FC<MatchSchedulerProps> = ({
   onAddMatch, 
   onImportMatches,
   onUpdateMatch,
+  onDeleteMatch,
   leagueSettings
 }) => {
   const [showAdd, setShowAdd] = useState(false);
@@ -41,6 +43,8 @@ const MatchScheduler: React.FC<MatchSchedulerProps> = ({
   const [editDate, setEditDate] = useState('');
   const [editTime, setEditTime] = useState('');
   const [editVenue, setEditVenue] = useState('');
+  const [editHomeTeamId, setEditHomeTeamId] = useState('');
+  const [editAwayTeamId, setEditAwayTeamId] = useState('');
   const [manualScorerNames, setManualScorerNames] = useState<Record<string, string>>({});
   
   const [newMatch, setNewMatch] = useState<Partial<Match>>({
@@ -182,6 +186,8 @@ const MatchScheduler: React.FC<MatchSchedulerProps> = ({
     setEditDate(match.date || '');
     setEditTime(match.time || '');
     setEditVenue(match.venue || '');
+    setEditHomeTeamId(match.homeTeamId);
+    setEditAwayTeamId(match.awayTeamId);
     setManualScorerNames({});
   };
 
@@ -236,7 +242,7 @@ const MatchScheduler: React.FC<MatchSchedulerProps> = ({
   };
 
   const saveResult = (match: Match) => {
-    onUpdateMatch(match.id, scores.home, scores.away, currentScorers, currentCards, currentReferee, currentRefereeGrade, isMatchCompleted, isMatchLive, editDate, editTime, editVenue);
+    onUpdateMatch(match.id, scores.home, scores.away, currentScorers, currentCards, currentReferee, currentRefereeGrade, isMatchCompleted, isMatchLive, editDate, editTime, editVenue, editHomeTeamId, editAwayTeamId);
     setEditingMatchId(null);
   };
 
@@ -463,10 +469,21 @@ const MatchScheduler: React.FC<MatchSchedulerProps> = ({
 
                 <div className="flex justify-center md:justify-end w-full md:w-1/4 mt-6 md:mt-0">
                   {canManageMatch(match) && !isEditing ? (
-                    <button onClick={(e) => startEditing(e, match)} className="bg-green-600 text-white px-6 py-2.5 rounded-xl text-sm font-black hover:bg-green-700 shadow-lg transition-all flex items-center space-x-2">
-                      <i className="fas fa-edit"></i>
-                      <span>{match.isCompleted ? 'Edit Result' : 'Enter Result'}</span>
-                    </button>
+                    <div className="flex items-center space-x-2">
+                      <button onClick={(e) => startEditing(e, match)} className="bg-green-600 text-white px-6 py-2.5 rounded-xl text-sm font-black hover:bg-green-700 shadow-lg transition-all flex items-center space-x-2">
+                        <i className="fas fa-edit"></i>
+                        <span>{match.isCompleted ? 'Edit Result' : 'Enter Result'}</span>
+                      </button>
+                      {isAdmin && onDeleteMatch && (
+                        <button 
+                          onClick={(e) => { e.stopPropagation(); onDeleteMatch(match.id); }} 
+                          className="bg-red-50 text-red-500 w-10 h-10 rounded-xl hover:bg-red-100 transition-all flex items-center justify-center border border-red-100"
+                          title="Delete Match"
+                        >
+                          <i className="fas fa-trash-alt"></i>
+                        </button>
+                      )}
+                    </div>
                   ) : isEditing ? (
                     <div className="flex space-x-2" onClick={e => e.stopPropagation()}>
                       <button onClick={() => saveResult(match)} className="bg-blue-600 text-white text-xs px-4 py-2 rounded-lg font-black uppercase">Save</button>
@@ -487,37 +504,64 @@ const MatchScheduler: React.FC<MatchSchedulerProps> = ({
                   <div className="bg-amber-50/50 p-6 rounded-2xl border border-amber-100">
                     <div className="flex items-center space-x-2 mb-4">
                       <i className="fas fa-calendar-alt text-amber-600"></i>
-                      <span className="text-[10px] font-black text-amber-800 uppercase tracking-[0.2em]">Reschedule Match</span>
+                      <span className="text-[10px] font-black text-amber-800 uppercase tracking-[0.2em]">Reschedule & Team Update</span>
                     </div>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <div className="space-y-1">
-                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">New Date</label>
-                        <input 
-                          type="date" 
-                          className="w-full bg-white border border-gray-200 rounded-xl px-4 py-2.5 font-bold focus:ring-2 focus:ring-amber-400 outline-none" 
-                          value={editDate} 
-                          onChange={(e) => setEditDate(e.target.value)}
-                        />
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">New Date</label>
+                          <input 
+                            type="date" 
+                            className="w-full bg-white border border-gray-200 rounded-xl px-4 py-2.5 font-bold focus:ring-2 focus:ring-amber-400 outline-none" 
+                            value={editDate} 
+                            onChange={(e) => setEditDate(e.target.value)}
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">New Time</label>
+                          <input 
+                            type="time" 
+                            className="w-full bg-white border border-gray-200 rounded-xl px-4 py-2.5 font-bold focus:ring-2 focus:ring-amber-400 outline-none" 
+                            value={editTime} 
+                            onChange={(e) => setEditTime(e.target.value)}
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">New Venue</label>
+                          <input 
+                            type="text" 
+                            placeholder="Change Venue..."
+                            className="w-full bg-white border border-gray-200 rounded-xl px-4 py-2.5 font-bold focus:ring-2 focus:ring-amber-400 outline-none" 
+                            value={editVenue} 
+                            onChange={(e) => setEditVenue(e.target.value)}
+                          />
+                        </div>
                       </div>
-                      <div className="space-y-1">
-                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">New Time</label>
-                        <input 
-                          type="time" 
-                          className="w-full bg-white border border-gray-200 rounded-xl px-4 py-2.5 font-bold focus:ring-2 focus:ring-amber-400 outline-none" 
-                          value={editTime} 
-                          onChange={(e) => setEditTime(e.target.value)}
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">New Venue</label>
-                        <input 
-                          type="text" 
-                          placeholder="Change Venue..."
-                          className="w-full bg-white border border-gray-200 rounded-xl px-4 py-2.5 font-bold focus:ring-2 focus:ring-amber-400 outline-none" 
-                          value={editVenue} 
-                          onChange={(e) => setEditVenue(e.target.value)}
-                        />
-                      </div>
+
+                      {isAdmin && (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Home Team</label>
+                            <select 
+                              className="w-full bg-white border border-gray-200 rounded-xl px-4 py-2.5 font-bold focus:ring-2 focus:ring-amber-400 outline-none" 
+                              value={editHomeTeamId} 
+                              onChange={(e) => setEditHomeTeamId(e.target.value)}
+                            >
+                              {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                            </select>
+                          </div>
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Away Team</label>
+                            <select 
+                              className="w-full bg-white border border-gray-200 rounded-xl px-4 py-2.5 font-bold focus:ring-2 focus:ring-amber-400 outline-none" 
+                              value={editAwayTeamId} 
+                              onChange={(e) => setEditAwayTeamId(e.target.value)}
+                            >
+                              {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                            </select>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
 

@@ -104,6 +104,12 @@ const App: React.FC = () => {
         args: [id]
       });
     },
+    deleteMatch: async (id: string) => {
+      await db.execute({
+        sql: "DELETE FROM matches WHERE id = ?",
+        args: [id]
+      });
+    },
     saveSettings: async (settings: LeagueSettings) => {
       await db.execute({
         sql: "INSERT INTO settings (id, data) VALUES ('global', ?) ON CONFLICT(id) DO UPDATE SET data = excluded.data",
@@ -360,7 +366,7 @@ const App: React.FC = () => {
                   });
                   alert(`${newMatches.length} matches processed.`);
                 }}
-                onUpdateMatch={(id, h, a, sc, c, ref, refG, isComp, isLive, date, time, venue) => {
+                onUpdateMatch={(id, h, a, sc, c, ref, refG, isComp, isLive, date, time, venue, hId, aId) => {
                   const updated = matches.map(m => m.id === id ? { 
                     ...m, 
                     homeScore: h, 
@@ -373,12 +379,20 @@ const App: React.FC = () => {
                     isLive: isLive !== undefined ? isLive : false,
                     date: date || m.date,
                     time: time || m.time,
-                    venue: venue || m.venue
+                    venue: venue || m.venue,
+                    homeTeamId: hId || m.homeTeamId,
+                    awayTeamId: aId || m.awayTeamId
                   } : m);
                   setMatches(updated);
                   const m = updated.find(u => u.id === id);
                   if (m) dbService.saveMatch(m).catch(() => {});
                 }} 
+                onDeleteMatch={(id) => {
+                  if (confirm('Are you sure you want to delete this match?')) {
+                    setMatches(prev => prev.filter(m => m.id !== id));
+                    dbService.deleteMatch(id).catch(() => {});
+                  }
+                }}
                 leagueSettings={leagueSettings} 
               />;
               case 'admin': return <AdminPanel 
