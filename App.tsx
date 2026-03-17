@@ -328,7 +328,7 @@ const App: React.FC = () => {
               case 'schedule': return <MatchScheduler 
                 matches={matches} teams={teams} isAdmin={role === UserRole.ADMIN} role={role} 
                 selectedTeamId={selectedTeamId} onAddMatch={(m) => { setMatches(p => [...p, m]); dbService.saveMatch(m).catch(() => {}); }} 
-                onUpdateMatch={(id, h, a, sc, c, ref, refG, isComp, isLive) => {
+                onUpdateMatch={(id, h, a, sc, c, ref, refG, isComp, isLive, date, time, venue) => {
                   const updated = matches.map(m => m.id === id ? { 
                     ...m, 
                     homeScore: h, 
@@ -338,7 +338,10 @@ const App: React.FC = () => {
                     refereeName: ref, 
                     refereeGrade: refG, 
                     isCompleted: isComp !== undefined ? isComp : true,
-                    isLive: isLive !== undefined ? isLive : false
+                    isLive: isLive !== undefined ? isLive : false,
+                    date: date || m.date,
+                    time: time || m.time,
+                    venue: venue || m.venue
                   } : m);
                   setMatches(updated);
                   const m = updated.find(u => u.id === id);

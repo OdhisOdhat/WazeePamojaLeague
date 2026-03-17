@@ -10,7 +10,7 @@ interface AdminPanelProps {
   ads: Ad[];
   leagueSettings: LeagueSettings;
   onUpdateLeagueSettings: (settings: LeagueSettings) => void;
-  onUpdateMatch: (id: string, h: number, a: number, scorers?: GoalScorer[], cards?: any[], refereeName?: string) => void;
+  onUpdateMatch: (id: string, h: number, a: number, scorers: GoalScorer[], cards?: any[], refereeName?: string, refereeGrade?: string, isCompleted?: boolean, isLive?: boolean, date?: string, time?: string, venue?: string) => void;
   onUpdateTeam?: (updatedTeam: Team) => void;
   onSaveNews: (item: NewsItem) => void;
   onDeleteNews: (id: string) => void;

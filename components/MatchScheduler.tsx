@@ -10,7 +10,7 @@ interface MatchSchedulerProps {
   role: UserRole;
   selectedTeamId: string | null;
   onAddMatch: (m: Match) => void;
-  onUpdateMatch: (id: string, h: number, a: number, scorers: GoalScorer[], cards?: CardEvent[], refereeName?: string, refereeGrade?: string, isCompleted?: boolean, isLive?: boolean) => void;
+  onUpdateMatch: (id: string, h: number, a: number, scorers: GoalScorer[], cards?: CardEvent[], refereeName?: string, refereeGrade?: string, isCompleted?: boolean, isLive?: boolean, date?: string, time?: string, venue?: string) => void;
   leagueSettings: LeagueSettings;
 }
 
@@ -34,6 +34,9 @@ const MatchScheduler: React.FC<MatchSchedulerProps> = ({
   const [currentRefereeGrade, setCurrentRefereeGrade] = useState('');
   const [isMatchLive, setIsMatchLive] = useState(false);
   const [isMatchCompleted, setIsMatchCompleted] = useState(false);
+  const [editDate, setEditDate] = useState('');
+  const [editTime, setEditTime] = useState('');
+  const [editVenue, setEditVenue] = useState('');
   const [manualScorerNames, setManualScorerNames] = useState<Record<string, string>>({});
   
   const [newMatch, setNewMatch] = useState<Partial<Match>>({
@@ -89,6 +92,9 @@ const MatchScheduler: React.FC<MatchSchedulerProps> = ({
     setCurrentRefereeGrade(match.refereeGrade || '');
     setIsMatchLive(match.isLive || false);
     setIsMatchCompleted(match.isCompleted || false);
+    setEditDate(match.date || '');
+    setEditTime(match.time || '');
+    setEditVenue(match.venue || '');
     setManualScorerNames({});
   };
 
@@ -143,7 +149,7 @@ const MatchScheduler: React.FC<MatchSchedulerProps> = ({
   };
 
   const saveResult = (match: Match) => {
-    onUpdateMatch(match.id, scores.home, scores.away, currentScorers, currentCards, currentReferee, currentRefereeGrade, isMatchCompleted, isMatchLive);
+    onUpdateMatch(match.id, scores.home, scores.away, currentScorers, currentCards, currentReferee, currentRefereeGrade, isMatchCompleted, isMatchLive, editDate, editTime, editVenue);
     setEditingMatchId(null);
   };
 
@@ -373,6 +379,44 @@ const MatchScheduler: React.FC<MatchSchedulerProps> = ({
 
               {isEditing && (
                 <div className="mt-8 pt-8 border-t border-gray-100 space-y-8 animate-in slide-in-from-bottom-2 duration-300" onClick={e => e.stopPropagation()}>
+                  {/* Reschedule Section */}
+                  <div className="bg-amber-50/50 p-6 rounded-2xl border border-amber-100">
+                    <div className="flex items-center space-x-2 mb-4">
+                      <i className="fas fa-calendar-alt text-amber-600"></i>
+                      <span className="text-[10px] font-black text-amber-800 uppercase tracking-[0.2em]">Reschedule Match</span>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">New Date</label>
+                        <input 
+                          type="date" 
+                          className="w-full bg-white border border-gray-200 rounded-xl px-4 py-2.5 font-bold focus:ring-2 focus:ring-amber-400 outline-none" 
+                          value={editDate} 
+                          onChange={(e) => setEditDate(e.target.value)}
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">New Time</label>
+                        <input 
+                          type="time" 
+                          className="w-full bg-white border border-gray-200 rounded-xl px-4 py-2.5 font-bold focus:ring-2 focus:ring-amber-400 outline-none" 
+                          value={editTime} 
+                          onChange={(e) => setEditTime(e.target.value)}
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">New Venue</label>
+                        <input 
+                          type="text" 
+                          placeholder="Change Venue..."
+                          className="w-full bg-white border border-gray-200 rounded-xl px-4 py-2.5 font-bold focus:ring-2 focus:ring-amber-400 outline-none" 
+                          value={editVenue} 
+                          onChange={(e) => setEditVenue(e.target.value)}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
                   {isAdmin && (
                     <div className="bg-blue-50/50 p-6 rounded-2xl border border-blue-100">
                       <div className="flex items-center space-x-2 mb-4">
