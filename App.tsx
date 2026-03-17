@@ -430,7 +430,7 @@ const App: React.FC = () => {
                 leagueSettings={leagueSettings} 
               />;
               case 'admin': return <AdminPanel 
-                teams={teams} matches={matches} news={news} ads={ads} leagueSettings={leagueSettings}
+                teams={teams} matches={matches} standings={standings} news={news} ads={ads} leagueSettings={leagueSettings}
                 onUpdateLeagueSettings={(s) => { setLeagueSettings(s); dbService.saveSettings(s).catch(() => {}); }}
                 onUpdateMatch={() => {}} 
                 onUpdateTeam={(t) => { setTeams(p => p.map(u => u.id === t.id ? t : u)); dbService.saveTeam(t).catch(() => {}); }}

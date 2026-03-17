@@ -1,11 +1,12 @@
 
 import React, { useState, useRef } from 'https://esm.sh/react@19.0.0';
 import * as XLSX from 'https://esm.sh/xlsx@0.18.5';
-import { Team, Match, GoalScorer, LeagueSettings, NewsItem, Ad, StandingOverride } from '../types.ts';
+import { Team, Match, Standing, GoalScorer, LeagueSettings, NewsItem, Ad, StandingOverride } from '../types.ts';
 
 interface AdminPanelProps {
   teams: Team[];
   matches: Match[];
+  standings: Standing[];
   news: NewsItem[];
   ads: Ad[];
   leagueSettings: LeagueSettings;
@@ -29,7 +30,7 @@ interface AdminPanelProps {
 }
 
 const AdminPanel: React.FC<AdminPanelProps> = ({ 
-  teams, news, ads, leagueSettings, onUpdateLeagueSettings, onUpdateTeam, onSaveNews, onDeleteNews, onDeleteNewsItems, onSaveAd, onDeleteAd, onDeleteAds, onRegisterTeam, onManageSquad, onReset, dbLogs, onForceSync, onImportMatches, onUpdateStandingOverrides 
+  teams, matches, standings, news, ads, leagueSettings, onUpdateLeagueSettings, onUpdateTeam, onSaveNews, onDeleteNews, onDeleteNewsItems, onSaveAd, onDeleteAd, onDeleteAds, onRegisterTeam, onManageSquad, onReset, dbLogs, onForceSync, onImportMatches, onUpdateStandingOverrides 
 }) => {
   const [editingTeam, setEditingTeam] = useState<Team | null>(null);
   const [settingsForm, setSettingsForm] = useState<LeagueSettings>(leagueSettings);
@@ -179,7 +180,18 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
       }];
     }
     setOverrides(newOverrides);
-    onUpdateStandingOverrides(newOverrides);
+  };
+
+  const handleSaveOverrides = () => {
+    onUpdateStandingOverrides(overrides);
+    alert('Standings adjustments saved successfully!');
+  };
+
+  const handleClearOverrides = () => {
+    if (confirm('Are you sure you want to clear all standings adjustments?')) {
+      setOverrides([]);
+      onUpdateStandingOverrides([]);
+    }
   };
 
   const toggleSection = (section: string) => setExpandedSections(prev => ({ ...prev, [section]: !prev[section] }));
@@ -308,7 +320,25 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
 
       {/* Standings Manual Adjustment */}
       <div className="bg-white p-8 rounded-[2rem] border border-gray-100 shadow-xl">
-        <SectionHeader title="Standings Adjustments" icon="fa-table" sectionKey="standings" />
+        <div className="flex items-center justify-between mb-6">
+          <SectionHeader title="Standings Adjustments" icon="fa-table" sectionKey="standings" />
+          {expandedSections.standings && (
+            <div className="flex items-center space-x-3">
+              <button 
+                onClick={handleClearOverrides}
+                className="text-[10px] font-black uppercase tracking-widest text-red-500 hover:text-red-600 transition-colors"
+              >
+                Clear All
+              </button>
+              <button 
+                onClick={handleSaveOverrides}
+                className="bg-blue-600 text-white px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-blue-700 transition-all shadow-lg shadow-blue-100"
+              >
+                Save Adjustments
+              </button>
+            </div>
+          )}
+        </div>
         {expandedSections.standings && (
           <div className="space-y-6 animate-in slide-in-from-top-2">
             <p className="text-xs text-gray-500 mb-4 italic">Manually adjust points, goals, or matches played for specific teams. These values are added to the calculated standings.</p>
@@ -317,12 +347,19 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                 <thead>
                   <tr className="text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-100">
                     <th className="pb-4">Team</th>
+                    <th className="pb-4 text-center">Actual Pts</th>
                     <th className="pb-4 text-center">Pts +/-</th>
+                    <th className="pb-4 text-center">Actual GF</th>
                     <th className="pb-4 text-center">GF +/-</th>
+                    <th className="pb-4 text-center">Actual GA</th>
                     <th className="pb-4 text-center">GA +/-</th>
+                    <th className="pb-4 text-center">Actual P</th>
                     <th className="pb-4 text-center">P +/-</th>
+                    <th className="pb-4 text-center">Actual W</th>
                     <th className="pb-4 text-center">W +/-</th>
+                    <th className="pb-4 text-center">Actual D</th>
                     <th className="pb-4 text-center">D +/-</th>
+                    <th className="pb-4 text-center">Actual L</th>
                     <th className="pb-4 text-center">L +/-</th>
                   </tr>
                 </thead>
@@ -331,34 +368,69 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                     const override = overrides.find(o => o.teamId === team.id) || {
                       pointsAdjustment: 0, goalsForAdjustment: 0, goalsAgainstAdjustment: 0, playedAdjustment: 0, wonAdjustment: 0, drawnAdjustment: 0, lostAdjustment: 0
                     };
+                    const actual = standings.find(s => s.teamId === team.id) || {
+                      points: 0, goalsFor: 0, goalsAgainst: 0, played: 0, won: 0, drawn: 0, lost: 0
+                    };
+                    
+                    const matchesOnly = {
+                      points: actual.points - (override.pointsAdjustment || 0),
+                      goalsFor: actual.goalsFor - (override.goalsForAdjustment || 0),
+                      goalsAgainst: actual.goalsAgainst - (override.goalsAgainstAdjustment || 0),
+                      played: actual.played - (override.playedAdjustment || 0),
+                      won: actual.won - (override.wonAdjustment || 0),
+                      drawn: actual.drawn - (override.drawnAdjustment || 0),
+                      lost: actual.lost - (override.lostAdjustment || 0)
+                    };
+
                     return (
-                      <tr key={team.id} className="group">
+                      <tr key={team.id} className="group hover:bg-gray-50/50 transition-colors">
                         <td className="py-4">
                           <div className="flex items-center space-x-2">
-                            <img src={team.logo} className="w-6 h-6 rounded-full" alt="" />
-                            <span className="text-sm font-bold text-gray-900">{team.name}</span>
+                            <img src={team.logo} className="w-8 h-8 rounded-full border border-gray-100 shadow-sm" alt="" />
+                            <span className="text-sm font-black text-gray-900">{team.name}</span>
                           </div>
                         </td>
                         <td className="py-4 text-center">
-                          <input type="number" className="w-16 text-center border border-gray-200 rounded-lg p-1 text-sm font-bold" value={override.pointsAdjustment} onChange={e => updateOverride(team.id, 'pointsAdjustment', parseInt(e.target.value) || 0)} />
+                          <span className="text-xs font-bold text-gray-400">{matchesOnly.points}</span>
                         </td>
                         <td className="py-4 text-center">
-                          <input type="number" className="w-16 text-center border border-gray-200 rounded-lg p-1 text-sm font-bold" value={override.goalsForAdjustment} onChange={e => updateOverride(team.id, 'goalsForAdjustment', parseInt(e.target.value) || 0)} />
+                          <input type="number" className="w-16 text-center border border-gray-200 rounded-lg p-1.5 text-sm font-black text-blue-600 focus:ring-2 focus:ring-blue-500 outline-none" value={override.pointsAdjustment} onChange={e => updateOverride(team.id, 'pointsAdjustment', parseInt(e.target.value) || 0)} />
                         </td>
                         <td className="py-4 text-center">
-                          <input type="number" className="w-16 text-center border border-gray-200 rounded-lg p-1 text-sm font-bold" value={override.goalsAgainstAdjustment} onChange={e => updateOverride(team.id, 'goalsAgainstAdjustment', parseInt(e.target.value) || 0)} />
+                          <span className="text-xs font-bold text-gray-400">{matchesOnly.goalsFor}</span>
                         </td>
                         <td className="py-4 text-center">
-                          <input type="number" className="w-16 text-center border border-gray-200 rounded-lg p-1 text-sm font-bold" value={override.playedAdjustment} onChange={e => updateOverride(team.id, 'playedAdjustment', parseInt(e.target.value) || 0)} />
+                          <input type="number" className="w-16 text-center border border-gray-200 rounded-lg p-1.5 text-sm font-black text-blue-600 focus:ring-2 focus:ring-blue-500 outline-none" value={override.goalsForAdjustment} onChange={e => updateOverride(team.id, 'goalsForAdjustment', parseInt(e.target.value) || 0)} />
                         </td>
                         <td className="py-4 text-center">
-                          <input type="number" className="w-16 text-center border border-gray-200 rounded-lg p-1 text-sm font-bold" value={override.wonAdjustment} onChange={e => updateOverride(team.id, 'wonAdjustment', parseInt(e.target.value) || 0)} />
+                          <span className="text-xs font-bold text-gray-400">{matchesOnly.goalsAgainst}</span>
                         </td>
                         <td className="py-4 text-center">
-                          <input type="number" className="w-16 text-center border border-gray-200 rounded-lg p-1 text-sm font-bold" value={override.drawnAdjustment} onChange={e => updateOverride(team.id, 'drawnAdjustment', parseInt(e.target.value) || 0)} />
+                          <input type="number" className="w-16 text-center border border-gray-200 rounded-lg p-1.5 text-sm font-black text-blue-600 focus:ring-2 focus:ring-blue-500 outline-none" value={override.goalsAgainstAdjustment} onChange={e => updateOverride(team.id, 'goalsAgainstAdjustment', parseInt(e.target.value) || 0)} />
                         </td>
                         <td className="py-4 text-center">
-                          <input type="number" className="w-16 text-center border border-gray-200 rounded-lg p-1 text-sm font-bold" value={override.lostAdjustment} onChange={e => updateOverride(team.id, 'lostAdjustment', parseInt(e.target.value) || 0)} />
+                          <span className="text-xs font-bold text-gray-400">{matchesOnly.played}</span>
+                        </td>
+                        <td className="py-4 text-center">
+                          <input type="number" className="w-16 text-center border border-gray-200 rounded-lg p-1.5 text-sm font-black text-blue-600 focus:ring-2 focus:ring-blue-500 outline-none" value={override.playedAdjustment} onChange={e => updateOverride(team.id, 'playedAdjustment', parseInt(e.target.value) || 0)} />
+                        </td>
+                        <td className="py-4 text-center">
+                          <span className="text-xs font-bold text-gray-400">{matchesOnly.won}</span>
+                        </td>
+                        <td className="py-4 text-center">
+                          <input type="number" className="w-16 text-center border border-gray-200 rounded-lg p-1.5 text-sm font-black text-blue-600 focus:ring-2 focus:ring-blue-500 outline-none" value={override.wonAdjustment} onChange={e => updateOverride(team.id, 'wonAdjustment', parseInt(e.target.value) || 0)} />
+                        </td>
+                        <td className="py-4 text-center">
+                          <span className="text-xs font-bold text-gray-400">{matchesOnly.drawn}</span>
+                        </td>
+                        <td className="py-4 text-center">
+                          <input type="number" className="w-16 text-center border border-gray-200 rounded-lg p-1.5 text-sm font-black text-blue-600 focus:ring-2 focus:ring-blue-500 outline-none" value={override.drawnAdjustment} onChange={e => updateOverride(team.id, 'drawnAdjustment', parseInt(e.target.value) || 0)} />
+                        </td>
+                        <td className="py-4 text-center">
+                          <span className="text-xs font-bold text-gray-400">{matchesOnly.lost}</span>
+                        </td>
+                        <td className="py-4 text-center">
+                          <input type="number" className="w-16 text-center border border-gray-200 rounded-lg p-1.5 text-sm font-black text-blue-600 focus:ring-2 focus:ring-blue-500 outline-none" value={override.lostAdjustment} onChange={e => updateOverride(team.id, 'lostAdjustment', parseInt(e.target.value) || 0)} />
                         </td>
                       </tr>
                     );
