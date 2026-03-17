@@ -440,6 +440,24 @@ const App: React.FC = () => {
           })()}
         </ErrorBoundary>
       </main>
+      <footer className="bg-white border-t border-gray-100 py-8 mt-auto">
+        <div className="container mx-auto px-4 text-center">
+          <p className="text-gray-400 text-xs font-black uppercase tracking-[0.3em]">
+            &copy; {new Date().getFullYear()} {leagueSettings.name} • All Rights Reserved
+          </p>
+          <div className="mt-4 flex flex-col items-center space-y-2">
+            <a 
+              href="https://odhistechie.web.app" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="group flex items-center space-x-2 text-[10px] font-black uppercase tracking-widest text-gray-400 hover:text-blue-600 transition-all"
+            >
+              <span>Developed by</span>
+              <span className="bg-gray-100 group-hover:bg-blue-50 px-2 py-1 rounded-md transition-colors">odhistechie.web.app</span>
+            </a>
+          </div>
+        </div>
+      </footer>
       <style>{`@keyframes progress { 0% { left: -30%; } 100% { left: 100%; } }`}</style>
     </div>
   );
