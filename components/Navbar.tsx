@@ -41,7 +41,9 @@ const Navbar: React.FC<NavbarProps> = ({ currentView, setView, role, username, o
           <NavItem active={currentView === 'schedule'} onClick={() => setView('schedule')} icon="fa-calendar-alt" label="Fixtures" />
           
           {role === UserRole.PUBLIC && (
-            <NavItem active={currentView === 'registration'} onClick={() => setView('registration')} icon="fa-user-plus" label="Join League" />
+            <div className="flex items-center px-4 py-2 text-gray-400 text-[10px] font-black uppercase tracking-widest italic">
+              Registration Closed
+            </div>
           )}
           
           {role === UserRole.TEAM_MANAGER && selectedTeamId && isTeamApproved && (
@@ -49,7 +51,9 @@ const Navbar: React.FC<NavbarProps> = ({ currentView, setView, role, username, o
           )}
 
           {role === UserRole.TEAM_MANAGER && !selectedTeamId && (
-            <NavItem active={currentView === 'registration'} onClick={() => setView('registration')} icon="fa-plus-circle" label="Register My Team" />
+            <div className="flex items-center px-4 py-2 text-gray-400 text-[10px] font-black uppercase tracking-widest italic">
+              Registration Closed
+            </div>
           )}
           
           {role === UserRole.ADMIN && (

@@ -454,7 +454,37 @@ const App: React.FC = () => {
               );
               case 'dashboard': return <Dashboard teams={teams} matches={matches} standings={standings} news={news} ads={ads} setView={setView} leagueSettings={leagueSettings} role={role} selectedTeamId={selectedTeamId} onTeamClick={(tid) => { setViewingTeamId(tid); setView('schedule'); }} />;
               case 'standings': return <StandingsTable standings={standings} teams={teams} leagueSettings={leagueSettings} onTeamClick={(tid) => { setViewingTeamId(tid); setView('schedule'); }} />;
-              case 'registration': return <TeamRegistration 
+              case 'registration': 
+                if (role !== UserRole.ADMIN && role !== UserRole.TEAM_MANAGER) {
+                  setView('dashboard');
+                  return null;
+                }
+                // If it's a manager, they can only register if they don't have a team yet
+                // But the user said "only admin can do it" now.
+                if (role === UserRole.TEAM_MANAGER && selectedTeamId) {
+                   setView('dashboard');
+                   return null;
+                }
+                // Actually, the user says "only admin can do it"
+                if (role !== UserRole.ADMIN) {
+                   return (
+                     <div className="max-w-2xl mx-auto bg-white p-12 rounded-[3rem] border border-red-100 shadow-2xl text-center space-y-6">
+                       <div className="w-20 h-20 bg-red-50 text-red-500 rounded-3xl flex items-center justify-center mx-auto">
+                         <i className="fas fa-lock text-3xl"></i>
+                       </div>
+                       <h2 className="text-3xl font-black text-gray-900 tracking-tight">Registration Closed</h2>
+                       <p className="text-gray-500 font-medium leading-relaxed">
+                         The team registration period for the current season has elapsed. 
+                         New registrations are currently restricted to league administrators only.
+                       </p>
+                       <button onClick={() => setView('dashboard')} className="bg-blue-600 text-white px-8 py-4 rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-blue-700 transition-all">
+                         Return to Dashboard
+                       </button>
+                     </div>
+                   );
+                }
+
+                return <TeamRegistration 
                 onRegister={(tData) => { 
                   const newTeamId = `t${Date.now()}`;
                   const newTeam = { ...tData, id: newTeamId, players: [], isApproved: role === UserRole.ADMIN };

@@ -105,7 +105,7 @@ const Dashboard: React.FC<DashboardProps> = ({
 
               <h1 className="text-4xl md:text-6xl font-black tracking-tight leading-[1.1] drop-shadow-lg">
                 {isManagerWithoutTeam ? (
-                  <>Ready to lead your <span className="text-blue-300">own squad?</span></>
+                  <>Registration <span className="text-red-300">Period Elapsed</span></>
                 ) : isTeamPendingApproval ? (
                   <>Team Registration <span className="text-amber-300">Pending Approval</span></>
                 ) : (
@@ -115,7 +115,7 @@ const Dashboard: React.FC<DashboardProps> = ({
 
               <p className="text-blue-50 text-lg opacity-90 max-w-2xl leading-relaxed drop-shadow-md">
                 {isManagerWithoutTeam 
-                  ? "You've successfully joined as a manager. The next step is to register your club and begin building your championship-winning squad." 
+                  ? "The team registration window for the current season has closed. Please contact the league administrator for any special inquiries." 
                   : isTeamPendingApproval
                   ? `Your team "${myTeam?.name}" has been registered successfully. Please wait for an administrator to approve your registration before you can manage your squad and matches.`
                   : leagueSettings.description}
@@ -123,13 +123,10 @@ const Dashboard: React.FC<DashboardProps> = ({
 
               <div className="pt-4 flex flex-wrap gap-4 justify-center md:justify-start">
                 {isManagerWithoutTeam ? (
-                  <button 
-                    onClick={() => setView('registration')}
-                    className="bg-white text-blue-700 px-10 py-4 rounded-[1.5rem] font-black uppercase text-xs tracking-[0.2em] hover:bg-blue-50 transition-all shadow-2xl hover:scale-105 active:scale-95 flex items-center space-x-3"
-                  >
-                    <i className="fas fa-plus-circle text-lg"></i>
-                    <span>Register My Team Now</span>
-                  </button>
+                  <div className="bg-red-500/20 backdrop-blur border border-red-300/50 text-red-100 px-8 py-4 rounded-[1.5rem] font-black uppercase text-xs tracking-widest flex items-center space-x-3">
+                    <i className="fas fa-lock"></i>
+                    <span>Registration Closed</span>
+                  </div>
                 ) : isTeamPendingApproval ? (
                   <div className="bg-amber-500/20 backdrop-blur border border-amber-300/50 text-amber-100 px-8 py-4 rounded-[1.5rem] font-black uppercase text-xs tracking-widest flex items-center space-x-3">
                     <i className="fas fa-clock animate-pulse"></i>
@@ -138,16 +135,16 @@ const Dashboard: React.FC<DashboardProps> = ({
                 ) : (
                   <>
                     <button 
-                      onClick={() => setView('registration')}
+                      onClick={() => setView('schedule')}
                       className="bg-white text-blue-700 px-8 py-4 rounded-[1.5rem] font-black uppercase text-xs tracking-widest hover:bg-blue-50 transition-all shadow-xl hover:scale-105 active:scale-95"
                     >
-                      Register a Team
+                      View Fixtures
                     </button>
                     <button 
-                      onClick={() => setView('schedule')}
+                      onClick={() => setView('standings')}
                       className="bg-blue-600/30 backdrop-blur border border-white/30 text-white px-8 py-4 rounded-[1.5rem] font-black uppercase text-xs tracking-widest hover:bg-blue-600/50 transition-all"
                     >
-                      View Fixtures
+                      League Table
                     </button>
                     <button 
                       onClick={() => {
