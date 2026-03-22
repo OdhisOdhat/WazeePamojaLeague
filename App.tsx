@@ -363,7 +363,7 @@ const App: React.FC = () => {
     teams.forEach(team => {
       table[team.id] = { teamId: team.id, teamName: team.name, played: 0, won: 0, drawn: 0, lost: 0, goalsFor: 0, goalsAgainst: 0, goalDifference: 0, points: 0 };
     });
-    matches.filter(m => m.isCompleted).forEach(match => {
+    matches.filter(m => m.status === 'finished' || m.isCompleted).forEach(match => {
       const home = table[match.homeTeamId];
       const away = table[match.awayTeamId];
       if (!home || !away) return;

@@ -42,6 +42,8 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
   const [selectedNewsIds, setSelectedNewsIds] = useState<string[]>([]);
   const [selectedAdIds, setSelectedAdIds] = useState<string[]>([]);
   const [teamSearch, setTeamSearch] = useState('');
+  const [editingStandingTeamId, setEditingStandingTeamId] = useState<string | null>(null);
+  const [currentOverride, setCurrentOverride] = useState<StandingOverride | null>(null);
   const [newsForm, setNewsForm] = useState<Partial<NewsItem>>({
     title: '', content: '', imageUrl: '', important: false
   });
@@ -87,6 +89,30 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Results");
     XLSX.writeFile(wb, "LeaguePro_Results_Template.xlsx");
+  };
+
+  const handleSaveOverride = () => {
+    if (!currentOverride) return;
+    const existing = leagueSettings.standingOverrides || [];
+    const updated = existing.some(o => o.teamId === currentOverride.teamId)
+      ? existing.map(o => o.teamId === currentOverride.teamId ? currentOverride : o)
+      : [...existing, currentOverride];
+    onUpdateStandingOverrides(updated);
+    setEditingStandingTeamId(null);
+    setCurrentOverride(null);
+  };
+
+  const getOverride = (teamId: string) => {
+    return (leagueSettings.standingOverrides || []).find(o => o.teamId === teamId) || {
+      teamId,
+      pointsAdjustment: 0,
+      goalsForAdjustment: 0,
+      goalsAgainstAdjustment: 0,
+      playedAdjustment: 0,
+      wonAdjustment: 0,
+      drawnAdjustment: 0,
+      lostAdjustment: 0
+    };
   };
 
   const handleXlsUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -804,6 +830,72 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
         </div>
       )}
 
+      {/* Standings Management */}
+      <div className="bg-white p-8 rounded-[2rem] border border-gray-100 shadow-xl">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
+          <SectionHeader title="League Standings Management" icon="fa-list-ol" sectionKey="standings" />
+          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Manually adjust points, goals, and records</p>
+        </div>
+        
+        {expandedSections.standings && (
+          <div className="space-y-4 animate-in slide-in-from-top-2">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-separate border-spacing-y-2">
+                <thead>
+                  <tr className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                    <th className="px-4 py-2">Team</th>
+                    <th className="px-4 py-2 text-center">P</th>
+                    <th className="px-4 py-2 text-center">W</th>
+                    <th className="px-4 py-2 text-center">D</th>
+                    <th className="px-4 py-2 text-center">L</th>
+                    <th className="px-4 py-2 text-center">GF</th>
+                    <th className="px-4 py-2 text-center">GA</th>
+                    <th className="px-4 py-2 text-center">GD</th>
+                    <th className="px-4 py-2 text-center">PTS</th>
+                    <th className="px-4 py-2 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {standings.map((s, idx) => {
+                    const override = (leagueSettings.standingOverrides || []).find(o => o.teamId === s.teamId);
+                    return (
+                      <tr key={s.teamId} className="bg-gray-50 rounded-xl hover:bg-white hover:shadow-md transition-all group">
+                        <td className="px-4 py-3 rounded-l-xl">
+                          <div className="flex items-center space-x-3">
+                            <span className="text-xs font-black text-gray-300 w-4">{idx + 1}</span>
+                            <span className="font-bold text-gray-900">{s.teamName}</span>
+                            {override && <span className="text-[8px] bg-amber-100 text-amber-600 px-1.5 py-0.5 rounded font-black uppercase tracking-tighter">Manual</span>}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 text-center font-bold text-gray-600">{s.played}</td>
+                        <td className="px-4 py-3 text-center font-bold text-gray-600">{s.won}</td>
+                        <td className="px-4 py-3 text-center font-bold text-gray-600">{s.drawn}</td>
+                        <td className="px-4 py-3 text-center font-bold text-gray-600">{s.lost}</td>
+                        <td className="px-4 py-3 text-center font-bold text-gray-600">{s.goalsFor}</td>
+                        <td className="px-4 py-3 text-center font-bold text-gray-600">{s.goalsAgainst}</td>
+                        <td className="px-4 py-3 text-center font-bold text-gray-600">{s.goalDifference}</td>
+                        <td className="px-4 py-3 text-center font-black text-blue-600">{s.points}</td>
+                        <td className="px-4 py-3 text-right rounded-r-xl">
+                          <button 
+                            onClick={() => {
+                              setEditingStandingTeamId(s.teamId);
+                              setCurrentOverride(getOverride(s.teamId));
+                            }}
+                            className="p-2 text-blue-500 hover:bg-blue-50 rounded-lg transition-colors"
+                          >
+                            <i className="fas fa-edit"></i>
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+      </div>
+
       {/* Teams Management */}
       <div className="bg-white p-8 rounded-[2rem] border border-gray-100 shadow-xl">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
@@ -870,6 +962,61 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
           <i className="fas fa-trash-alt mr-2"></i> Reset Local Data
         </button>
       </div>
+
+      {editingStandingTeamId && currentOverride && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-gray-900/40 backdrop-blur-sm animate-in fade-in duration-300">
+          <div className="bg-white w-full max-w-2xl rounded-[3rem] shadow-2xl overflow-hidden p-8 animate-in zoom-in-95">
+            <div className="flex justify-between items-center mb-6">
+              <div>
+                <h3 className="text-2xl font-black text-gray-900">Adjust Standings</h3>
+                <p className="text-sm text-gray-500 font-medium">Manual adjustments for {standings.find(s => s.teamId === editingStandingTeamId)?.teamName}</p>
+              </div>
+              <button onClick={() => setEditingStandingTeamId(null)} className="text-gray-400 hover:text-gray-600"><i className="fas fa-times text-xl"></i></button>
+            </div>
+            
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+              {[
+                { label: 'Points', key: 'pointsAdjustment' },
+                { label: 'Played', key: 'playedAdjustment' },
+                { label: 'Won', key: 'wonAdjustment' },
+                { label: 'Drawn', key: 'drawnAdjustment' },
+                { label: 'Lost', key: 'lostAdjustment' },
+                { label: 'Goals For', key: 'goalsForAdjustment' },
+                { label: 'Goals Against', key: 'goalsAgainstAdjustment' },
+              ].map(field => (
+                <div key={field.key} className="space-y-1">
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">{field.label}</label>
+                  <input 
+                    type="number" 
+                    className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-2.5 font-bold focus:ring-2 focus:ring-blue-500 outline-none" 
+                    value={(currentOverride as any)[field.key]} 
+                    onChange={e => setCurrentOverride({ ...currentOverride, [field.key]: parseInt(e.target.value) || 0 })}
+                  />
+                </div>
+              ))}
+            </div>
+
+            <div className="flex space-x-3">
+              <button 
+                onClick={handleSaveOverride}
+                className="flex-1 bg-blue-600 text-white p-4 rounded-2xl font-black uppercase tracking-widest shadow-xl hover:bg-blue-700 transition-all"
+              >
+                Save Adjustments
+              </button>
+              <button 
+                onClick={() => {
+                  const updated = (leagueSettings.standingOverrides || []).filter(o => o.teamId !== editingStandingTeamId);
+                  onUpdateStandingOverrides(updated);
+                  setEditingStandingTeamId(null);
+                }}
+                className="px-6 bg-red-50 text-red-600 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-red-100 transition-all"
+              >
+                Reset
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {editingTeam && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-gray-900/40 backdrop-blur-sm animate-in fade-in duration-300">
